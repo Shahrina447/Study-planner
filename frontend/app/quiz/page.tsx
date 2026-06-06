@@ -42,7 +42,7 @@ function QuizPageInner() {
     setAnsweredSet(new Set());
 
     try {
-      const res = await fetch("http://localhost:8000/quiz/generate", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/quiz/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ function QuizPageInner() {
       <div className="px-6 md:px-12 py-10 max-w-3xl mx-auto">
 
         {/* Header */}
-        <header className="mb-8 flex items-end justify-between">
+        <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Quiz Me</p>
             <h1 className="text-4xl md:text-5xl mt-2 font-display font-bold">
@@ -192,7 +192,7 @@ function QuizPageInner() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {docFilter && (
               <button
                 onClick={handleNewQuiz}

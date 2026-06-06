@@ -486,7 +486,7 @@ export function ChatView() {
     setTyping(true);
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -574,7 +574,7 @@ export function ChatView() {
   };
 
   return (
-    <div className="flex flex-col h-screen min-w-0">
+    <div className="flex flex-col h-full min-w-0">
       {/* Top bar */}
       <header className="h-20 flex items-center justify-between px-6 md:px-10 border-b border-border bg-card shrink-0">
         <div>

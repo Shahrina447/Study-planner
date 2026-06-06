@@ -15,7 +15,7 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
-const API = "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type IndexedDoc = {
   filename: string;
@@ -124,16 +124,16 @@ export default function DocumentsPage() {
 
         {/* Stats row */}
         {indexed.length > 0 && (
-          <div className="flex gap-4 mb-8">
-            <div className="flex-1 rounded-2xl bg-card border border-border px-5 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="rounded-2xl bg-card border border-border px-5 py-4">
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-display">Documents</p>
               <p className="text-3xl font-display font-bold mt-1">{indexed.length}</p>
             </div>
-            <div className="flex-1 rounded-2xl bg-card border border-border px-5 py-4">
+            <div className="rounded-2xl bg-card border border-border px-5 py-4">
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-display">Total Chunks</p>
               <p className="text-3xl font-display font-bold mt-1">{totalChunks.toLocaleString()}</p>
             </div>
-            <div className="flex-1 rounded-2xl bg-primary/10 border border-primary/20 px-5 py-4 flex flex-col justify-between">
+            <div className="rounded-2xl bg-primary/10 border border-primary/20 px-5 py-4 flex flex-col justify-between gap-3 sm:gap-0">
               <p className="text-[11px] uppercase tracking-widest text-primary font-display font-bold">Ready to use</p>
               <div className="flex gap-2 mt-2">
                 <Link
@@ -212,74 +212,75 @@ export default function DocumentsPage() {
                 return (
                   <div
                     key={doc.filename}
-                    className="flex items-center gap-4 px-5 py-4 hover:bg-accent/10 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 hover:bg-accent/10 transition-colors"
                   >
-                    {/* Icon */}
-                    <div className={`h-10 w-10 rounded-xl grid place-items-center shrink-0 ${
-                      isIndexed ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
-                    }`}>
-                      <FileText className="h-5 w-5" />
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[14px] font-medium text-foreground truncate">
-                        {doc.filename}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
-                        {isIndexed
-                          ? `${(doc as IndexedDoc).chunks} chunks · indexed ${formatDate((doc as IndexedDoc).indexed_at)}`
-                          : isUploading
-                          ? "Uploading and indexing…"
-                          : "Upload failed"}
-                      </p>
-                    </div>
-
-                    {/* Status */}
-                    {isIndexed && (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Indexed
-                      </span>
-                    )}
-                    {isUploading && (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1 shrink-0">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Indexing
-                      </span>
-                    )}
-                    {isError && (
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1 shrink-0">
-                        Error
-                      </span>
-                    )}
-
-                    {/* Delete */}
-                    {isIndexed && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Link
-                          href={`/?doc=${encodeURIComponent(doc.filename)}`}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[11px] font-display font-bold"
-                          title="Chat with this document"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          Chat
-                        </Link>
-                        <Link
-                          href={`/quiz?doc=${encodeURIComponent(doc.filename)}`}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors text-[11px] font-display font-bold"
-                          title="Quiz from this document"
-                        >
-                          <HelpCircle className="h-3.5 w-3.5" />
-                          Quiz
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(doc.filename)}
-                          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10"
-                          title="Remove from index"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                    {/* Left: Icon & Info */}
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`h-10 w-10 rounded-xl grid place-items-center shrink-0 ${
+                        isIndexed ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                      }`}>
+                        <FileText className="h-5 w-5" />
                       </div>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium text-foreground truncate">
+                          {doc.filename}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                          {isIndexed
+                            ? `${(doc as IndexedDoc).chunks} chunks · indexed ${formatDate((doc as IndexedDoc).indexed_at)}`
+                            : isUploading
+                            ? "Uploading and indexing…"
+                            : "Upload failed"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right: Status & Actions */}
+                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                      {isIndexed && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Indexed
+                        </span>
+                      )}
+                      {isUploading && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Indexing
+                        </span>
+                      )}
+                      {isError && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-rose-600 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-1">
+                          Error
+                        </span>
+                      )}
+
+                      {isIndexed && (
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/?doc=${encodeURIComponent(doc.filename)}`}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-[11px] font-display font-bold"
+                            title="Chat with this document"
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                            <span>Chat</span>
+                          </Link>
+                          <Link
+                            href={`/quiz?doc=${encodeURIComponent(doc.filename)}`}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors text-[11px] font-display font-bold"
+                            title="Quiz from this document"
+                          >
+                            <HelpCircle className="h-3.5 w-3.5" />
+                            <span>Quiz</span>
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(doc.filename)}
+                            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10"
+                            title="Remove from index"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -287,7 +288,7 @@ export default function DocumentsPage() {
 
             {/* Call to action */}
             {indexed.length > 0 && (
-              <div className="mt-6 rounded-2xl bg-primary/5 border border-primary/20 p-5 flex items-center justify-between gap-4">
+              <div className="mt-6 rounded-2xl bg-primary/5 border border-primary/20 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     {indexed.length} document{indexed.length > 1 ? "s" : ""} ready
@@ -296,16 +297,16 @@ export default function DocumentsPage() {
                     Start a conversation or generate a quiz from your indexed materials.
                   </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 w-full sm:w-auto">
                   <Link
                     href="/"
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-display font-bold uppercase tracking-tight hover:opacity-90 transition-all"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-display font-bold uppercase tracking-tight hover:opacity-90 transition-all"
                   >
                     <MessageSquare className="h-3.5 w-3.5" /> Chat now
                   </Link>
                   <Link
                     href="/quiz"
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-display font-bold uppercase tracking-tight hover:bg-secondary transition-all"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-card border border-border text-foreground text-xs font-display font-bold uppercase tracking-tight hover:bg-secondary transition-all"
                   >
                     <HelpCircle className="h-3.5 w-3.5" /> Take quiz
                   </Link>

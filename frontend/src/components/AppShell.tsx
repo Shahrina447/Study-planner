@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen bg-secondary text-foreground">
+    <div className="flex h-screen overflow-hidden bg-secondary text-foreground">
       <aside className="hidden md:flex w-64 flex-col border-r border-border bg-card">
         <div className="p-8 pb-4">
           <div className="flex items-center gap-2.5 mb-10">
@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0 h-full overflow-hidden">
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center">
@@ -71,8 +71,30 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="font-display text-lg font-bold">Study Planner</span>
           </div>
         </header>
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
       </div>
+
+      {/* Bottom Nav Bar on Mobile */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center justify-around z-50">
+        {nav.map((item) => {
+          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-1 w-20 h-full transition-colors ${
+                active
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              <span className="text-[10px] font-medium tracking-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
