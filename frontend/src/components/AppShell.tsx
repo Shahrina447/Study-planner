@@ -63,14 +63,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0 h-full overflow-hidden">
-        <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-primary text-primary-foreground grid place-items-center">
-              <BookOpen className="h-4 w-4" />
-            </div>
-            <span className="font-display text-lg font-bold">Study Planner</span>
-          </div>
-        </header>
         <main className="flex-1 min-w-0 overflow-y-auto">{children}</main>
       </div>
 

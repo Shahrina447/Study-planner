@@ -576,27 +576,27 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full min-w-0">
       {/* Top bar */}
-      <header className="h-20 flex items-center justify-between px-6 md:px-10 border-b border-border bg-card shrink-0">
+      <header className="h-16 md:h-20 flex items-center justify-between px-4 md:px-10 border-b border-border bg-card shrink-0">
         <div>
-          <h1 className="font-display text-xl font-bold tracking-tight">Good morning, Shahrina.</h1>
+          <h1 className="font-display text-sm sm:text-base md:text-xl font-bold tracking-tight">Good morning, Shahrina.</h1>
           {docFilter && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <FileText className="h-3 w-3 text-primary" />
-              <span className="text-[11px] text-primary font-medium truncate max-w-[260px]">
+            <div className="flex items-center gap-1 mt-0.5">
+              <FileText className="h-3 w-3 text-primary shrink-0" />
+              <span className="text-[10px] md:text-[11px] text-primary font-medium truncate max-w-[150px] sm:max-w-[260px]">
                 Scoped to: {docFilter}
               </span>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {/* Mode indicator */}
-          <span className={`font-display text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-tight ${modeBadge.color}`}>
+          <span className={`font-display text-[9px] md:text-[10px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-full uppercase tracking-tight ${modeBadge.color}`}>
             {modeBadge.label} Mode
           </span>
           {/* Settings toggle */}
           <button
             onClick={() => setShowSettings((v) => !v)}
-            className={`h-9 w-9 rounded-xl flex items-center justify-center transition-colors ${
+            className={`h-9 w-9 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
               showSettings
                 ? "bg-primary text-primary-foreground"
                 : "bg-secondary text-muted-foreground hover:text-foreground"
@@ -615,17 +615,17 @@ export function ChatView() {
       </header>
 
       {/* Dashboard surface */}
-      <div className="flex-1 flex flex-col lg:flex-row p-4 md:p-6 gap-6 overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative">
         {/* Chat centerpiece */}
         <section className="flex-[2.5] flex flex-col bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-w-0">
-          <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8">
             {/* Messages */}
             <div className="space-y-6">
               {messages.map((m) =>
                 m.role === "user" ? (
                   <div key={m.id} className="flex justify-end">
-                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3">
-                      <p className="text-[15px] leading-relaxed">{m.text}</p>
+                    <div className="max-w-[85%] sm:max-w-[80%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3">
+                      <p className="text-[14px] sm:text-[15px] leading-relaxed">{m.text}</p>
                       <p className="font-display text-[10px] mt-1 text-primary-foreground/70 text-right">
                         {m.time}
                       </p>
@@ -672,29 +672,31 @@ export function ChatView() {
           </div>
 
           {/* Composer */}
-          <div className="p-6 pt-0">
+          <div className="p-4 md:p-6 pt-0">
             {/* Quick mode switcher strip */}
-            <div className="flex gap-2 mb-3">
-              {(["ai", "corpus", "compare"] as ResponseMode[]).map((m) => {
-                const Icon = m === "ai" ? Brain : m === "corpus" ? Database : GitCompare;
-                const labels = { ai: "AI", corpus: "Corpus", compare: "Compare" };
-                return (
-                  <button
-                    key={m}
-                    onClick={() => switchMode(m)}
-                    disabled={typing}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-display font-bold uppercase tracking-tight transition-all disabled:opacity-50 ${
-                      ragSettings.mode === m
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {labels[m]}
-                  </button>
-                );
-              })}
-              <span className="ml-auto font-display text-[10px] text-muted-foreground self-center">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="flex gap-1.5">
+                {(["ai", "corpus", "compare"] as ResponseMode[]).map((m) => {
+                  const Icon = m === "ai" ? Brain : m === "corpus" ? Database : GitCompare;
+                  const labels = { ai: "AI", corpus: "Corpus", compare: "Compare" };
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => switchMode(m)}
+                      disabled={typing}
+                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-display font-bold uppercase tracking-tight transition-all disabled:opacity-50 ${
+                        ragSettings.mode === m
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-secondary text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="h-3 w-3" />
+                      <span>{labels[m]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="ml-auto font-display text-[9px] sm:text-[10px] text-muted-foreground self-center">
                 K={ragSettings.topK} · sim≥{ragSettings.similarityThreshold.toFixed(2)}
               </span>
             </div>
@@ -718,7 +720,7 @@ export function ChatView() {
                 }}
                 rows={1}
                 placeholder="Ask anything from your notes…"
-                className="w-full h-14 pl-12 pr-16 bg-secondary/60 border border-border rounded-2xl text-sm resize-none outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all py-4"
+                className="w-full h-14 pl-12 pr-16 bg-secondary/60 border border-border rounded-2xl text-[14px] sm:text-sm resize-none outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all py-4"
               />
               <button
                 type="submit"
@@ -728,15 +730,23 @@ export function ChatView() {
                 <Send className="h-4 w-4" />
               </button>
             </form>
-            <p className="font-display text-center text-[10px] text-muted-foreground mt-3 uppercase tracking-tight">
+            <p className="font-display text-center text-[9px] sm:text-[10px] text-muted-foreground mt-3 uppercase tracking-tight">
               Study Planner grounds every claim with citations from your uploads.
             </p>
           </div>
         </section>
 
+        {/* Settings Panel Mobile Backdrop */}
+        {showSettings && (
+          <div
+            className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setShowSettings(false)}
+          />
+        )}
+
         {/* Settings Panel */}
         {showSettings && (
-          <aside className="w-full lg:w-72 shrink-0">
+          <aside className="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-card border-l border-border shadow-2xl p-4 flex flex-col lg:relative lg:inset-auto lg:z-auto lg:w-72 lg:max-w-none lg:shadow-none lg:border-l-0 lg:p-0 shrink-0 h-full">
             <SettingsPanel
               settings={ragSettings}
               onChange={handleSettingsChange}
