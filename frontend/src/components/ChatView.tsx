@@ -574,7 +574,7 @@ export function ChatView() {
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0">
+    <div className={`flex flex-col h-full min-w-0 ${showSettings ? 'overflow-hidden' : ''}`}>
       {/* Top bar */}
       <header className="h-16 md:h-20 flex items-center justify-between px-4 md:px-10 border-b border-border bg-card shrink-0">
         <div>
@@ -615,7 +615,7 @@ export function ChatView() {
       </header>
 
       {/* Dashboard surface */}
-      <div className="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative">
+      <div className={`flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative ${showSettings ? 'hidden lg:flex' : ''}`}>
         {/* Chat centerpiece */}
         <section className="flex-[2.5] flex flex-col bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-w-0">
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
