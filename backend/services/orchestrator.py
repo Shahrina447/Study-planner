@@ -1,7 +1,9 @@
 import re
-from mistralai.client import Mistral
+import asyncio
+from mistralai import Mistral
 from config import settings
 from rag.retriever import retriever
+
 
 class StudyOrchestrator:
     def __init__(self):
@@ -10,30 +12,22 @@ class StudyOrchestrator:
         else:
             self.client = None
 
-    def _clean_text(self, text: str) -> str:
-        """
-        Normalise raw PDF-extracted text into clean paragraph prose.
-        - Remove lines that are just numbers, page markers, or very short noise
-        - Collapse mid-sentence line breaks
-        - Preserve intentional paragraph breaks
-        """
-        # Normalise line endings
-        text = text.replace("\r\n", "\n").replace("\r", "\n")
+    # ── Text helpers ──────────────────────────────────────────────────────────
 
-        # Split into paragraphs on blank lines
+    def _clean_text(self, text: str) -> str:
+        """Normalise raw PDF-extracted text into clean paragraph prose."""
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
         paragraphs = re.split(r"\n{2,}", text)
         cleaned = []
         for para in paragraphs:
             lines = [l.strip() for l in para.split("\n") if l.strip()]
-            # Filter out noise lines: pure numbers, single chars, page markers
             lines = [
                 l for l in lines
-                if not re.fullmatch(r"[\d\s\-–—|/\\]+", l)   # lines that are only digits/symbols
-                and len(l) > 3                                  # too short to be content
+                if not re.fullmatch(r"[\d\s\-–—|/\\]+", l)
+                and len(l) > 3
             ]
             if not lines:
                 continue
-            # Join lines into flowing prose
             joined = ""
             for line in lines:
                 if joined and joined[-1] not in ".!?:;,\"')}]":
@@ -44,196 +38,252 @@ class StudyOrchestrator:
                 cleaned.append(joined)
         return "\n\n".join(cleaned)
 
-
-    def _build_prompt(self, user_message: str, context_text: str) -> str:
-        return f"""You are a study planner and teaching assistant. 
-Based on the student's uploaded documents (provided below), you have two main tasks:
-
-1. Answer Questions: If the student asks a question about the content, answer it accurately and completely using ONLY the provided study notes. If the notes do not contain the answer, say "I cannot find this in your uploaded study materials."
-2. Create Study Plans: If the student asks for a study plan, create a personalized weekly study plan. 
-   Rules for Study Plans:
-   - Extract all topics and subtopics from the syllabus/document chunks provided.
-   - Estimate study time per topic based on content length and complexity.
-   - Distribute topics across available days before the exam date.
-   - Flag topics with weak quiz scores (if mentioned) as high priority.
-   - Output format for study plans:
-     Day 1: Topic — [name], Duration — [X hours], Priority — [High/Medium/Low]
-     Day 2: ...
-
-Uploaded Documents / Study Notes:
-{context_text}
-
-Student Request/Question: {user_message}
-"""
-
-    async def chat(self, user_message: str, top_k: int = 5, similarity_threshold: float = 0.0, temperature: float = 0.3, source_file: str | None = None):
-        context_chunks = await retriever.search(user_message, top_k=top_k, similarity_threshold=similarity_threshold, source_file=source_file)
-        context_text = "\n\n".join([f"Source: {c['source_file']}\nContent: {c['content']}" for c in context_chunks])
-        sources = list(set(c['source_file'] for c in context_chunks))
-
-        if not self.client:
-            return {
-                "status": "error",
-                "response": "MISTRAL_API_KEY is missing in backend/.env file.",
-                "sources": sources
-            }
-
-        try:
-            response = await self.client.chat.complete_async(
-                model=settings.MISTRAL_MODEL,
-                messages=[{"role": "user", "content": self._build_prompt(user_message, context_text)}],
-                temperature=temperature,
-            )
-            return {
-                "status": "success",
-                "response": response.choices[0].message.content,
-                "sources": sources
-            }
-        except Exception as e:
-            return {"status": "error", "response": f"Error calling Mistral: {e}"}
-
-    async def corpus_only(self, user_message: str, top_k: int = 5, similarity_threshold: float = 0.0, temperature: float = 0.3, source_file: str | None = None):
-        """Synthesise a single unified answer from all retrieved chunks, with inline source citations."""
-        context_chunks = await retriever.search(user_message, top_k=top_k, similarity_threshold=similarity_threshold, source_file=source_file)
-        sources = list(set(c['source_file'] for c in context_chunks))
-
-        if not context_chunks:
-            return {
-                "status": "success",
-                "response": "No relevant passages found in your uploaded documents for this query.",
-                "sources": [],
-                "chunks": []
-            }
-
-        # Build a clean context block grouping content by source
-        source_groups: dict[str, list[str]] = {}
-        for chunk in context_chunks:
-            src = chunk["source_file"]
-            cleaned = self._clean_text(chunk["content"])
-            if cleaned:
-                source_groups.setdefault(src, []).append(cleaned)
-
-        context_text = "\n\n".join([
-            f"[{src}]\n" + " ".join(passages)
-            for src, passages in source_groups.items()
-        ])
-
-        if not self.client:
-            # Fallback: return cleaned grouped text without AI
-            return {
-                "status": "success",
-                "response": context_text,
-                "sources": sources,
-                "chunks": []
-            }
-
-        prompt = (
-            f"You are a study assistant. A student asked:\n\"{user_message}\"\n\n"
-            f"Below are relevant passages extracted from their study documents, labelled by source file.\n\n"
-            f"{context_text}\n\n"
-            f"Write a well-structured, easy-to-read answer using Markdown formatting:\n"
-            f"- Start with a short **bold summary** (1-2 sentences) of the main answer\n"
-            f"- Use `##` headings to break the answer into logical sections\n"
-            f"- Use bullet points (`-`) or numbered lists for steps, features, or enumerated items\n"
-            f"- Use **bold** to highlight key terms or important concepts\n"
-            f"- Cite the source file inline in parentheses when you use information from it, e.g. (make-a-7-day-study-plan.pdf)\n"
-            f"- End with a `## Summary` section recapping the key points in 2-3 bullet points\n"
-            f"- Do NOT use headings like 'Chunk 1' or 'From PDF X'\n"
-            f"- Only use information present in the passages — do not add outside knowledge\n"
-        )
-
-        try:
-            response = await self.client.chat.complete_async(
-                model=settings.MISTRAL_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-            )
-            answer = response.choices[0].message.content.strip()
-
-            # Still return chunk data for the compare view, but cleaned
-            formatted_chunks = []
-            for i, chunk in enumerate(context_chunks, 1):
-                similarity = chunk.get("similarity", None)
-                formatted_chunks.append({
-                    "index": i,
-                    "source": chunk["source_file"],
-                    "content": self._clean_text(chunk["content"]),
-                    "similarity": round(float(similarity), 4) if similarity is not None else None,
-                })
-
-            return {
-                "status": "success",
-                "response": answer,
-                "sources": sources,
-                "chunks": formatted_chunks,
-            }
-        except Exception as e:
-            return {"status": "error", "response": f"Error calling Mistral: {e}", "sources": sources, "chunks": []}
-
-    async def compare(self, user_message: str, top_k: int = 5, similarity_threshold: float = 0.0, temperature: float = 0.3, source_file: str | None = None):
-        """Return both AI-synthesized response and corpus-synthesised answer side by side."""
-        context_chunks = await retriever.search(user_message, top_k=top_k, similarity_threshold=similarity_threshold, source_file=source_file)
-        context_text = "\n\n".join([f"Source: {c['source_file']}\nContent: {c['content']}" for c in context_chunks])
-        sources = list(set(c['source_file'] for c in context_chunks))
-
-        # Build grouped context for corpus synthesis
-        source_groups: dict[str, list[str]] = {}
-        for chunk in context_chunks:
-            src = chunk["source_file"]
-            cleaned = self._clean_text(chunk["content"])
-            if cleaned:
-                source_groups.setdefault(src, []).append(cleaned)
-
-        grouped_context = "\n\n".join([
-            f"[{src}]\n" + " ".join(passages)
-            for src, passages in source_groups.items()
-        ])
-
-        corpus_prompt = (
-            f"You are a study assistant. A student asked:\n\"{user_message}\"\n\n"
-            f"Below are relevant passages extracted from their study documents, labelled by source file.\n\n"
-            f"{grouped_context}\n\n"
-            f"Write a well-structured, easy-to-read answer using Markdown formatting:\n"
-            f"- Start with a short **bold summary** (1-2 sentences) of the main answer\n"
-            f"- Use `##` headings to break the answer into logical sections\n"
-            f"- Use bullet points (`-`) or numbered lists for steps, features, or enumerated items\n"
-            f"- Use **bold** to highlight key terms or important concepts\n"
-            f"- Cite the source file inline in parentheses when you use information from it, e.g. (StudyPlan_v7.pdf)\n"
-            f"- End with a `## Summary` section recapping the key points in 2-3 bullet points\n"
-            f"- Do NOT use headings like 'Chunk 1' or 'From PDF X'\n"
-            f"- Only use information present in the passages.\n"
-        )
-
-        # Formatted chunks for the collapsible detail view
-        formatted_chunks = []
+    def _format_chunks_for_display(self, context_chunks: list[dict]) -> list[dict]:
+        """Return cleaned chunk dicts for the frontend compare/corpus view."""
+        result = []
         for i, chunk in enumerate(context_chunks, 1):
-            similarity = chunk.get("similarity", None)
-            formatted_chunks.append({
+            similarity = chunk.get("similarity")
+            result.append({
                 "index": i,
                 "source": chunk["source_file"],
                 "content": self._clean_text(chunk["content"]),
                 "similarity": round(float(similarity), 4) if similarity is not None else None,
             })
+        return result
+
+    # ── Prompts ───────────────────────────────────────────────────────────────
+
+    def _build_ai_prompt(self, user_message: str, context_text: str) -> str:
+        """
+        AI mode: Mistral uses RAG context as grounding but may draw on its own
+        knowledge to fill gaps and produce a well-rounded answer.
+        """
+        return f"""You are a knowledgeable study planner and teaching assistant.
+The student's uploaded study documents are provided below as your primary knowledge source.
+
+Your job:
+1. **Answer questions** – synthesise an accurate, helpful answer from the provided passages.
+   - Piece together information from multiple chunks even if no single chunk fully answers the question.
+   - Use Markdown (bold key terms, bullet lists, short paragraphs).
+   - You may supplement with general knowledge where the documents leave gaps, but always ground your answer in the provided material first.
+2. **Create study plans** – if asked, produce a personalised weekly plan:
+   - Extract topics/subtopics from the document chunks.
+   - Estimate study time per topic based on content depth.
+   - Distribute across available days; mark high-priority topics.
+   - Format: `Day N: Topic — <name> | Duration — <X h> | Priority — High/Medium/Low`
+3. Never flatly refuse a reasonable study-related question. If the documents don't cover a topic, say so briefly and then answer from general knowledge.
+
+--- Retrieved study material ---
+{context_text}
+--- End of study material ---
+
+Student question: {user_message}
+"""
+
+    def _build_corpus_prompt(self, user_message: str, grouped_context: str) -> str:
+        """
+        Corpus mode: Mistral is only allowed to use the retrieved passages.
+        It must cite sources and must NOT add outside knowledge.
+        """
+        return f"""You are a document-grounded study assistant.
+A student asked: "{user_message}"
+
+Below are the exact passages retrieved from their uploaded study documents (grouped by source file).
+Your answer MUST be based solely on these passages — do not add any information from outside them.
+
+{grouped_context}
+
+Write a well-structured answer in Markdown:
+- Open with a short **bold summary** (1-2 sentences)
+- Use `##` headings for logical sections
+- Use bullet points or numbered lists for steps/features
+- **Bold** key terms
+- Cite the source file inline, e.g. (make-a-7-day-study-plan.pdf)
+- End with a `## Summary` section (2-3 bullet points)
+- Do NOT invent information not present in the passages above
+"""
+
+    # ── Shared retrieval helper ───────────────────────────────────────────────
+
+    async def _retrieve(
+        self,
+        query: str,
+        top_k: int,
+        similarity_threshold: float,
+        source_file: str | None,
+    ) -> tuple[list[dict], str, str, dict[str, list[str]]]:
+        """
+        Returns (chunks, flat_context_text, grouped_context_text, source_groups).
+        flat_context_text  – used for AI mode prompt
+        grouped_context    – used for corpus mode prompt
+        """
+        chunks = await retriever.search(
+            query,
+            top_k=top_k,
+            similarity_threshold=similarity_threshold,
+            source_file=source_file,
+        )
+
+        # Flat context for AI prompt
+        flat_context = "\n\n".join(
+            f"Source: {c['source_file']}\nContent: {c['content']}"
+            for c in chunks
+        )
+
+        # Grouped + cleaned context for corpus prompt
+        source_groups: dict[str, list[str]] = {}
+        for chunk in chunks:
+            cleaned = self._clean_text(chunk["content"])
+            if cleaned:
+                source_groups.setdefault(chunk["source_file"], []).append(cleaned)
+
+        grouped_context = "\n\n".join(
+            f"[{src}]\n" + " ".join(passages)
+            for src, passages in source_groups.items()
+        )
+
+        return chunks, flat_context, grouped_context, source_groups
+
+    # ── Public methods ────────────────────────────────────────────────────────
+
+    async def chat(
+        self,
+        user_message: str,
+        top_k: int = 5,
+        similarity_threshold: float = 0.0,
+        temperature: float = 0.3,
+        source_file: str | None = None,
+    ):
+        """
+        AI mode — Mistral synthesises an answer grounded in RAG context.
+        """
+        chunks, flat_context, _, _ = await self._retrieve(
+            user_message, top_k, similarity_threshold, source_file
+        )
+        sources = list(set(c["source_file"] for c in chunks))
 
         if not self.client:
             return {
                 "status": "error",
-                "ai_response": "MISTRAL_API_KEY is missing in backend/.env file.",
-                "corpus_response": grouped_context,
+                "response": "MISTRAL_API_KEY is missing in backend/.env",
                 "sources": sources,
-                "chunks": formatted_chunks
             }
 
         try:
-            import asyncio
+            resp = await self.client.chat.complete_async(
+                model=settings.MISTRAL_MODEL,
+                messages=[
+                    {"role": "user", "content": self._build_ai_prompt(user_message, flat_context)}
+                ],
+                temperature=temperature,
+            )
+            return {
+                "status": "success",
+                "response": resp.choices[0].message.content,
+                "sources": sources,
+            }
+        except Exception as e:
+            return {"status": "error", "response": f"Mistral error: {e}", "sources": sources}
+
+    async def corpus_only(
+        self,
+        user_message: str,
+        top_k: int = 5,
+        similarity_threshold: float = 0.0,
+        temperature: float = 0.3,
+        source_file: str | None = None,
+    ):
+        """
+        Corpus mode — answer is built ONLY from retrieved RAG passages.
+        No outside knowledge from Mistral; the model is just a formatter/synthesiser
+        of the raw document text.
+        """
+        chunks, _, grouped_context, _ = await self._retrieve(
+            user_message, top_k, similarity_threshold, source_file
+        )
+        sources = list(set(c["source_file"] for c in chunks))
+        display_chunks = self._format_chunks_for_display(chunks)
+
+        if not chunks:
+            return {
+                "status": "success",
+                "response": "No relevant passages found in your uploaded documents for this query.",
+                "sources": [],
+                "chunks": [],
+            }
+
+        # If no Mistral client, fall back to returning the raw cleaned passages
+        if not self.client:
+            return {
+                "status": "success",
+                "response": grouped_context,
+                "sources": sources,
+                "chunks": display_chunks,
+            }
+
+        try:
+            resp = await self.client.chat.complete_async(
+                model=settings.MISTRAL_MODEL,
+                messages=[
+                    {"role": "user", "content": self._build_corpus_prompt(user_message, grouped_context)}
+                ],
+                temperature=temperature,
+            )
+            return {
+                "status": "success",
+                "response": resp.choices[0].message.content.strip(),
+                "sources": sources,
+                "chunks": display_chunks,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "response": f"Mistral error: {e}",
+                "sources": sources,
+                "chunks": display_chunks,
+            }
+
+    async def compare(
+        self,
+        user_message: str,
+        top_k: int = 5,
+        similarity_threshold: float = 0.0,
+        temperature: float = 0.3,
+        source_file: str | None = None,
+    ):
+        """
+        Compare mode — runs AI and Corpus calls in parallel and returns both.
+        AI tab  : Mistral with its own knowledge + RAG grounding
+        Corpus tab: Mistral restricted to RAG passages only
+        """
+        chunks, flat_context, grouped_context, _ = await self._retrieve(
+            user_message, top_k, similarity_threshold, source_file
+        )
+        sources = list(set(c["source_file"] for c in chunks))
+        display_chunks = self._format_chunks_for_display(chunks)
+
+        if not self.client:
+            return {
+                "status": "error",
+                "ai_response": "MISTRAL_API_KEY is missing in backend/.env",
+                "corpus_response": grouped_context,
+                "sources": sources,
+                "chunks": display_chunks,
+            }
+
+        try:
             ai_task = self.client.chat.complete_async(
                 model=settings.MISTRAL_MODEL,
-                messages=[{"role": "user", "content": self._build_prompt(user_message, context_text)}],
+                messages=[
+                    {"role": "user", "content": self._build_ai_prompt(user_message, flat_context)}
+                ],
                 temperature=temperature,
             )
             corpus_task = self.client.chat.complete_async(
                 model=settings.MISTRAL_MODEL,
-                messages=[{"role": "user", "content": corpus_prompt}],
+                messages=[
+                    {"role": "user", "content": self._build_corpus_prompt(user_message, grouped_context)}
+                ],
                 temperature=temperature,
             )
             ai_resp, corpus_resp = await asyncio.gather(ai_task, corpus_task)
@@ -242,15 +292,16 @@ Student Request/Question: {user_message}
                 "ai_response": ai_resp.choices[0].message.content,
                 "corpus_response": corpus_resp.choices[0].message.content.strip(),
                 "sources": sources,
-                "chunks": formatted_chunks
+                "chunks": display_chunks,
             }
         except Exception as e:
             return {
                 "status": "error",
-                "ai_response": f"Error calling Mistral: {e}",
+                "ai_response": f"Mistral error: {e}",
                 "corpus_response": grouped_context,
                 "sources": sources,
-                "chunks": formatted_chunks
+                "chunks": display_chunks,
             }
+
 
 orchestrator = StudyOrchestrator()

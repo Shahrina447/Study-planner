@@ -596,11 +596,7 @@ export function ChatView() {
           {/* Settings toggle */}
           <button
             onClick={() => setShowSettings((v) => !v)}
-            className={`h-9 w-9 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
-              showSettings
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
+            className="h-9 w-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground shadow-md z-50"
             title="RAG Settings"
           >
             <Settings2 className="h-4 w-4" />
@@ -614,10 +610,29 @@ export function ChatView() {
         </div>
       </header>
 
+      {/* Mobile backdrop — rendered outside the dashboard surface so it's never hidden */}
+      {showSettings && (
+        <div
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Settings Panel — rendered outside the dashboard surface so conditional hide doesn't affect it */}
+      {showSettings && (
+        <aside className="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-card border-l border-border shadow-2xl flex flex-col overflow-y-auto lg:hidden">
+          <SettingsPanel
+            settings={ragSettings}
+            onChange={handleSettingsChange}
+            onClose={() => setShowSettings(false)}
+          />
+        </aside>
+      )}
+
       {/* Dashboard surface */}
-      <div className={`flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative ${showSettings ? 'hidden lg:flex' : ''}`}>
-        {/* Chat centerpiece */}
-        <section className="flex-[2.5] flex flex-col bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative">
+        {/* Chat centerpiece — hidden on mobile when settings open to prevent double-page effect */}
+        <section className={`flex-[2.5] flex flex-col bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-w-0 ${showSettings ? 'hidden lg:flex' : ''}`}>
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             {/* Messages */}
             <div className="space-y-6">
@@ -736,17 +751,9 @@ export function ChatView() {
           </div>
         </section>
 
-        {/* Settings Panel Mobile Backdrop */}
+        {/* Desktop settings panel (inside dashboard surface for side-by-side layout) */}
         {showSettings && (
-          <div
-            className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
-            onClick={() => setShowSettings(false)}
-          />
-        )}
-
-        {/* Settings Panel */}
-        {showSettings && (
-          <aside className="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-card border-l border-border shadow-2xl p-4 flex flex-col lg:relative lg:inset-auto lg:z-auto lg:w-72 lg:max-w-none lg:shadow-none lg:border-l-0 lg:p-0 shrink-0 h-full">
+          <aside className="hidden lg:flex lg:w-72 shrink-0 flex-col">
             <SettingsPanel
               settings={ragSettings}
               onChange={handleSettingsChange}
