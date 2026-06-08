@@ -1,12 +1,21 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
 
 class Settings(BaseSettings):
-    MISTRAL_API_KEY: str = ""
-    MISTRAL_MODEL: str = "mistral-small-latest"
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/atlas"
-    CORS_ORIGIN: str = "http://localhost:3000"
+    MISTRAL_API_KEY: str
+    MISTRAL_MODEL: str
+    DATABASE_URL: str | None = None
+    CORS_ORIGIN: str
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 settings = Settings()

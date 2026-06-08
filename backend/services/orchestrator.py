@@ -1,6 +1,6 @@
 import re
 import asyncio
-from mistralai import Mistral
+from mistralai.client import Mistral
 from config import settings
 from rag.retriever import retriever
 
