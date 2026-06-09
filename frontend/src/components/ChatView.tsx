@@ -1,767 +1,573 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Send,
-  Paperclip,
-  Copy,
-  BookOpen,
-  Zap,
-  Settings2,
-  X,
+  AlertTriangle,
   Brain,
+  ClipboardList,
   Database,
-  GitCompare,
-  ChevronDown,
   FileText,
+  Loader2,
+  Send,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type ResponseMode = "ai" | "corpus" | "compare";
-
 type CorpusChunk = {
   index: number;
+  chunk_id?: string;
   source: string;
   content: string;
   similarity: number | null;
 };
 
-type Message = {
-  id: string;
-  role: "user" | "bot";
-  text?: string;
-  // compare mode
-  aiText?: string;
-  corpusText?: string;
-  chunks?: CorpusChunk[];
-  mode?: ResponseMode;
-  sources?: string[];
-  time: string;
+type Risk = {
+  label: string;
+  reason: string;
 };
 
-// ─── Settings Panel ───────────────────────────────────────────────────────────
+type SystemResult = {
+  status: string;
+  response: string;
+  sources?: string[];
+  chunks?: CorpusChunk[];
+  risk?: Risk;
+  response_time_seconds?: number;
+};
 
-type RAGSettings = {
+type CompareResponse = {
+  status: string;
+  conversation_id?: number;
+  systems: {
+    s0: SystemResult;
+    corpus: SystemResult;
+    s1: SystemResult;
+    s2: SystemResult;
+  };
+};
+
+type StoredMessage = {
+  id: number;
+  role: "user" | "assistant" | "system";
+  content: string;
+  metadata?: CompareResponse;
+  created_at: string;
+};
+
+type StoredConversation = {
+  id: number;
+  title: string;
+  messages: StoredMessage[];
+};
+
+type ResultRow = {
+  id: string;
+  question: string;
+  time: string;
+  systems?: CompareResponse["systems"];
+  error?: string;
+};
+
+type CompareSettings = {
   topK: number;
   similarityThreshold: number;
   temperature: number;
-  mode: ResponseMode;
 };
 
-function SettingsPanel({
-  settings,
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const columns = [
+  {
+    key: "s0",
+    title: "S0",
+    subtitle: "Basic chatbot",
+    icon: Brain,
+    color: "text-slate-700",
+    border: "border-slate-200",
+    accent: "bg-slate-100",
+  },
+  {
+    key: "corpus",
+    title: "Research Corpus",
+    subtitle: "Retrieved chunks",
+    icon: Database,
+    color: "text-amber-700",
+    border: "border-amber-200",
+    accent: "bg-amber-100",
+  },
+  {
+    key: "s1",
+    title: "S1",
+    subtitle: "Basic RAG",
+    icon: Sparkles,
+    color: "text-blue-700",
+    border: "border-blue-200",
+    accent: "bg-blue-100",
+  },
+  {
+    key: "s2",
+    title: "S2",
+    subtitle: "Safety-aware RAG",
+    icon: ShieldCheck,
+    color: "text-emerald-700",
+    border: "border-emerald-200",
+    accent: "bg-emerald-100",
+  },
+] as const;
+
+function SettingSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
   onChange,
-  onClose,
+  format = String,
 }: {
-  settings: RAGSettings;
-  onChange: (s: RAGSettings) => void;
-  onClose: () => void;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  format?: (value: number) => string;
 }) {
-  const modes: { id: ResponseMode; label: string; icon: typeof Brain; desc: string }[] = [
-    { id: "ai", label: "AI Response", icon: Brain, desc: "Mistral synthesises an answer from retrieved chunks" },
-    { id: "corpus", label: "Corpus Only", icon: Database, desc: "One unified answer synthesised from all your documents, with inline citations" },
-    { id: "compare", label: "Compare", icon: GitCompare, desc: "Side-by-side: AI answer vs raw corpus passages" },
-  ];
+  return (
+    <label className="grid gap-1.5 min-w-[150px]">
+      <span className="flex items-center justify-between gap-3 font-display text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+        <span className="text-foreground">{format(value)}</span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="accent-primary"
+      />
+    </label>
+  );
+}
+
+function SourceList({ sources }: { sources?: string[] }) {
+  if (!sources?.length) return null;
 
   return (
-    <div className="flex flex-col bg-card border border-border rounded-2xl shadow-lg overflow-hidden h-full">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-primary" />
-          <span className="font-display text-sm font-bold tracking-tight">RAG Settings</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="h-7 w-7 rounded-lg hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {sources.slice(0, 3).map((source) => (
+        <span
+          key={source}
+          className="inline-flex max-w-full items-center gap-1 rounded-md bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground"
         >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5 space-y-7">
-        {/* Response Mode */}
-        <div>
-          <label className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground block mb-3">
-            Response Mode
-          </label>
-          <div className="space-y-2">
-            {modes.map((m) => {
-              const Icon = m.icon;
-              const active = settings.mode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => onChange({ ...settings, mode: m.id })}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
-                    active
-                      ? "border-primary bg-primary/5 text-foreground"
-                      : "border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${active ? "text-primary" : ""}`} />
-                  <div>
-                    <p className="text-xs font-semibold">{m.label}</p>
-                    <p className="text-[11px] opacity-70 mt-0.5 leading-tight">{m.desc}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Top-K */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-              Top-K Chunks
-            </label>
-            <span className="font-display text-xs font-bold text-primary tabular-nums">
-              {settings.topK}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={20}
-            step={1}
-            value={settings.topK}
-            onChange={(e) => onChange({ ...settings, topK: Number(e.target.value) })}
-            className="w-full accent-primary h-1.5 rounded-full cursor-pointer"
-          />
-          <div className="flex justify-between mt-1">
-            <span className="font-display text-[9px] text-muted-foreground">1</span>
-            <span className="font-display text-[9px] text-muted-foreground">20</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
-            Number of document chunks retrieved from the vector store per query.
-          </p>
-        </div>
-
-        {/* Similarity Threshold */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-              Similarity Threshold
-            </label>
-            <span className="font-display text-xs font-bold text-primary tabular-nums">
-              {settings.similarityThreshold.toFixed(2)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={settings.similarityThreshold}
-            onChange={(e) =>
-              onChange({ ...settings, similarityThreshold: Number(e.target.value) })
-            }
-            className="w-full accent-primary h-1.5 rounded-full cursor-pointer"
-          />
-          <div className="flex justify-between mt-1">
-            <span className="font-display text-[9px] text-muted-foreground">0.00</span>
-            <span className="font-display text-[9px] text-muted-foreground">1.00</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
-            Minimum cosine similarity required for a chunk to be included. Higher = more relevant only.
-          </p>
-        </div>
-
-        {/* Temperature */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-              Temperature
-            </label>
-            <span className="font-display text-xs font-bold text-primary tabular-nums">
-              {(settings.temperature ?? 0.3).toFixed(2)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={1.5}
-            step={0.05}
-            value={settings.temperature ?? 0.3}
-            onChange={(e) => onChange({ ...settings, temperature: Number(e.target.value) })}
-            className="w-full accent-primary h-1.5 rounded-full cursor-pointer"
-          />
-          <div className="flex justify-between mt-1">
-            <span className="font-display text-[9px] text-muted-foreground">0.00 · Precise</span>
-            <span className="font-display text-[9px] text-muted-foreground">1.50 · Creative</span>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
-            Controls how creative or focused the AI response is. Lower = more factual, higher = more varied.
-          </p>
-        </div>
-
-        {/* Summary */}
-        <div className="rounded-xl bg-secondary/50 border border-border p-3 space-y-1.5">
-          <p className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-2">
-            Current Config
-          </p>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Mode</span>
-            <span className="font-semibold text-foreground capitalize">{settings.mode}</span>
-          </div>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Top-K</span>
-            <span className="font-semibold text-foreground">{settings.topK} chunks</span>
-          </div>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Min. Similarity</span>
-            <span className="font-semibold text-foreground">{settings.similarityThreshold.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Temperature</span>
-            <span className="font-semibold text-foreground">{(settings.temperature ?? 0.3).toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
+          <FileText className="h-3 w-3 shrink-0" />
+          <span className="truncate">{source}</span>
+        </span>
+      ))}
+      {sources.length > 3 && (
+        <span className="rounded-md bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
+          +{sources.length - 3}
+        </span>
+      )}
     </div>
   );
 }
 
-// ─── Compare View ─────────────────────────────────────────────────────────────
-
-function CompareView({ aiText, corpusText, chunks }: { aiText: string; corpusText: string; chunks?: CorpusChunk[] }) {
-  const [activeTab, setActiveTab] = useState<"ai" | "corpus">("ai");
-  const [expandedChunk, setExpandedChunk] = useState<number | null>(null);
+function ChunkList({ chunks }: { chunks?: CorpusChunk[] }) {
+  if (!chunks?.length) {
+    return (
+      <p className="mt-4 rounded-md border border-dashed border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+        No chunks retrieved yet.
+      </p>
+    );
+  }
 
   return (
-    <div className="w-full">
-      {/* Tab switcher */}
-      <div className="flex gap-1 p-1 bg-secondary/70 rounded-xl mb-4">
-        <button
-          onClick={() => setActiveTab("ai")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-display font-bold uppercase tracking-wide transition-all ${
-            activeTab === "ai"
-              ? "bg-card shadow-sm text-violet-600 border border-violet-200/60"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Brain className="h-3.5 w-3.5" />
-          AI Synthesis
-        </button>
-        <button
-          onClick={() => setActiveTab("corpus")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-display font-bold uppercase tracking-wide transition-all ${
-            activeTab === "corpus"
-              ? "bg-card shadow-sm text-amber-600 border border-amber-200/60"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Database className="h-3.5 w-3.5" />
-          From Documents
-        </button>
-      </div>
-
-      {/* AI Tab */}
-      {activeTab === "ai" && (
-        <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-violet-50/30 border border-violet-200/60 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="h-6 w-6 rounded-lg bg-violet-500 text-white grid place-items-center">
-              <Brain className="h-3.5 w-3.5" />
-            </div>
-            <span className="font-display text-[11px] font-bold uppercase tracking-widest text-violet-600">
-              AI-Synthesised Answer
-            </span>
-          </div>
-          <div className="prose prose-sm dark:prose-invert max-w-none text-[14px] leading-relaxed text-foreground/85">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiText}</ReactMarkdown>
-          </div>
-        </div>
-      )}
-
-      {/* Corpus Tab */}
-      {activeTab === "corpus" && (
-        <div className="space-y-3">
-          {/* Unified corpus answer */}
-          <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-amber-50/30 border border-amber-200/60 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-6 w-6 rounded-lg bg-amber-500 text-white grid place-items-center">
-                <Database className="h-3.5 w-3.5" />
-              </div>
-              <span className="font-display text-[11px] font-bold uppercase tracking-widest text-amber-600">
-                Answer from Your Documents
+    <div className="mt-4 space-y-2">
+      {chunks.slice(0, 5).map((chunk) => {
+        const match = chunk.similarity !== null ? Math.round(chunk.similarity * 100) : null;
+        return (
+          <details key={`${chunk.chunk_id}-${chunk.index}`} className="rounded-md border border-border bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold">
+              <span className="min-w-0 truncate">
+                {chunk.chunk_id ?? `C${chunk.index}`} · {chunk.source}
               </span>
-            </div>
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[14px] leading-relaxed text-foreground/85">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{corpusText}</ReactMarkdown>
-            </div>
-          </div>
-
-          {/* Source passages — collapsible */}
-          {chunks && chunks.length > 0 && (
-            <div>
-              <p className="font-display text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground px-1 mb-2">
-                Source passages ({chunks.length})
-              </p>
-              <div className="space-y-2">
-                {chunks.map((chunk) => {
-                  const isExpanded = expandedChunk === chunk.index;
-                  const matchPct = chunk.similarity !== null ? Math.round(chunk.similarity * 100) : null;
-                  const matchColor =
-                    chunk.similarity === null ? ""
-                    : chunk.similarity >= 0.7 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
-                    : chunk.similarity >= 0.4 ? "text-amber-600 bg-amber-50 border-amber-200"
-                    : "text-rose-600 bg-rose-50 border-rose-200";
-
-                  return (
-                    <div key={chunk.index} className="rounded-xl border border-border bg-card overflow-hidden">
-                      <button
-                        onClick={() => setExpandedChunk(isExpanded ? null : chunk.index)}
-                        className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-secondary/40 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="h-5 w-5 rounded-md bg-secondary grid place-items-center font-display text-[10px] font-bold text-muted-foreground shrink-0">
-                            {chunk.index}
-                          </span>
-                          <span className="text-[12px] text-foreground/80 truncate font-medium">
-                            {chunk.source.replace(/\.pdf$/i, "")}
-                          </span>
-                          {matchPct !== null && (
-                            <span className={`font-display text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${matchColor}`}>
-                              {matchPct}% match
-                            </span>
-                          )}
-                        </div>
-                        <div className={`h-5 w-5 rounded-full border grid place-items-center shrink-0 transition-transform ${isExpanded ? "rotate-180 border-primary text-primary" : "border-border text-muted-foreground"}`}>
-                          <ChevronDown className="h-3 w-3" />
-                        </div>
-                      </button>
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-1 border-t border-border/50">
-                          <p className="text-[13px] leading-relaxed text-foreground/75 font-mono whitespace-pre-wrap">
-                            {chunk.content}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+              {match !== null && (
+                <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-display text-[10px] text-muted-foreground">
+                  {match}%
+                </span>
+              )}
+            </summary>
+            <p className="border-t border-border px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground/70">
+              {chunk.content}
+            </p>
+          </details>
+        );
+      })}
     </div>
   );
 }
 
-// ─── Bot Message ──────────────────────────────────────────────────────────────
-
-function BotMessage({ message }: { message: Message }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    const text = message.mode === "compare" ? (message.aiText ?? "") : (message.text ?? "");
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-
-  const modeLabel =
-    message.mode === "ai"
-      ? { label: "AI", icon: Brain, color: "text-violet-500" }
-      : message.mode === "corpus"
-      ? { label: "Corpus", icon: Database, color: "text-amber-500" }
-      : message.mode === "compare"
-      ? { label: "Compare", icon: GitCompare, color: "text-primary" }
-      : null;
+function SystemPanel({
+  config,
+  result,
+  loading,
+}: {
+  config: (typeof columns)[number];
+  result?: SystemResult;
+  loading: boolean;
+}) {
+  const Icon = config.icon;
+  const isCorpus = config.key === "corpus";
+  const isSafety = config.key === "s2";
 
   return (
-    <div className="flex gap-4">
-      <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 text-primary grid place-items-center">
-        <Zap className="h-5 w-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        {/* Source badge + mode pill */}
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          {message.sources && message.sources.length > 0 && (
-            <div className="inline-flex items-center gap-2 rounded-md bg-secondary text-foreground/80 px-2.5 py-1 text-[11px] font-mono">
-              <BookOpen className="h-3 w-3" />
-              <span>{message.sources[0]}</span>
-              {message.sources.length > 1 && (
-                <span className="opacity-60">+{message.sources.length - 1} more</span>
-              )}
-            </div>
-          )}
-          {modeLabel && (
-            <div className={`inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-[11px] font-display font-bold uppercase tracking-tight ${modeLabel.color}`}>
-              <modeLabel.icon className="h-3 w-3" />
-              {modeLabel.label}
-            </div>
+    <section className={`flex min-h-[420px] min-w-[280px] flex-col rounded-lg border ${config.border} bg-card`}>
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <div className={`grid h-9 w-9 place-items-center rounded-md ${config.accent} ${config.color}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-display text-sm font-bold tracking-normal">{config.title}</h2>
+          <p className="text-xs text-muted-foreground">{config.subtitle}</p>
+          {result?.response_time_seconds !== undefined && (
+            <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+              {result.response_time_seconds.toFixed(2)}s
+            </p>
           )}
         </div>
+      </div>
 
-        {/* Content */}
-        {message.mode === "compare" ? (
-          <div className="rounded-2xl rounded-tl-sm bg-secondary/60 border border-border/60 p-5">
-            <CompareView
-              aiText={message.aiText ?? ""}
-              corpusText={message.corpusText ?? ""}
-              chunks={message.chunks}
-            />
-            <div className="mt-4 flex items-center gap-4 font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-t border-border/40 pt-3">
-              <span>{message.time}</span>
-              <button onClick={handleCopy} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-                <Copy className="h-3 w-3" /> {copied ? "Copied!" : "Copy AI"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className={`rounded-2xl rounded-tl-sm border p-5 ${
-            message.mode === "corpus"
-              ? "bg-gradient-to-br from-amber-50 to-amber-50/30 border-amber-200/60"
-              : "bg-secondary/60 border-border/60"
-          }`}>
-            {message.mode === "corpus" && (
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-6 w-6 rounded-lg bg-amber-500 text-white grid place-items-center">
-                  <Database className="h-3.5 w-3.5" />
-                </div>
-                <span className="font-display text-[11px] font-bold uppercase tracking-widest text-amber-600">
-                  Answer from Your Documents
-                </span>
-              </div>
-            )}
-            <div className="prose prose-sm dark:prose-invert max-w-none text-[15px] leading-relaxed text-foreground/85">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text ?? ""}</ReactMarkdown>
-            </div>
-            <div className="mt-4 flex items-center gap-4 font-display text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              <span>{message.time}</span>
-              <button onClick={handleCopy} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-                <Copy className="h-3 w-3" /> {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading && (
+          <div className="flex h-full min-h-52 items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         )}
+
+        {!loading && !result && (
+          <div className="flex h-full min-h-52 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <ClipboardList className="h-6 w-6" />
+            <p className="text-sm">Waiting for a question.</p>
+          </div>
+        )}
+
+        {!loading && result && (
+          <>
+            {isSafety && result.risk && (
+              <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-center gap-2 font-display text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {result.risk.label}
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-emerald-900/75">{result.risk.reason}</p>
+              </div>
+            )}
+
+            {result.status === "error" && (
+              <div className="mb-4 flex gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{result.response}</span>
+              </div>
+            )}
+
+            <div className="prose prose-sm max-w-none text-[13px] leading-relaxed text-foreground/85 prose-headings:font-display prose-headings:tracking-normal">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.response || "No response."}</ReactMarkdown>
+            </div>
+
+            <SourceList sources={result.sources} />
+            {(isCorpus || isSafety || config.key === "s1") && <ChunkList chunks={result.chunks} />}
+          </>
+        )}
       </div>
-    </div>
+    </section>
   );
 }
 
-// ─── ChatView ─────────────────────────────────────────────────────────────────
-
-const seed: Message[] = [];
-
 export function ChatView() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const docFilter = searchParams.get("doc"); // e.g. "StudyPlan_v7.pdf"
-
-  const [messages, setMessages] = useState<Message[]>([]);
+  const docFilter = searchParams.get("doc");
+  const selectedConversationId = searchParams.get("conversation");
   const [input, setInput] = useState("");
-  const [typing, setTyping] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [ragSettings, setRagSettings] = useState<RAGSettings>({
+  const [settings, setSettings] = useState<CompareSettings>({
     topK: 5,
-    similarityThreshold: 0.0,
+    similarityThreshold: 0,
     temperature: 0.3,
-    mode: "ai",
   });
-  // Track the last user question so we can re-fetch on mode change
-  const lastQuestionRef = useRef<string | null>(null);
+  const [rows, setRows] = useState<ResultRow[]>([]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [loadingRowId, setLoadingRowId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
+  }, [rows, loadingRowId]);
 
-  const modeBadge = {
-    ai: { label: "AI", color: "bg-violet-100 text-violet-700" },
-    corpus: { label: "Corpus", color: "bg-amber-100 text-amber-700" },
-    compare: { label: "Compare", color: "bg-primary/10 text-primary" },
-  }[ragSettings.mode];
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setConversationId(null);
+      setRows([]);
+      return;
+    }
 
-  /** Core fetch — does NOT add a user bubble, just appends a bot reply */
-  const fetchResponse = async (text: string, settingsOverride: RAGSettings) => {
+    const id = Number(selectedConversationId);
+    if (!Number.isInteger(id)) {
+      setConversationId(null);
+      setRows([]);
+      return;
+    }
+
+    const loadConversation = async () => {
+      setLoadingConversation(true);
+      try {
+        const response = await fetch(`${API_URL}/conversations/${id}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Conversation not found");
+        const conversation: StoredConversation = await response.json();
+        const restoredRows: ResultRow[] = [];
+
+        for (let index = 0; index < conversation.messages.length; index += 1) {
+          const userMessage = conversation.messages[index];
+          if (userMessage.role !== "user") continue;
+          const assistantMessage = conversation.messages
+            .slice(index + 1)
+            .find((message) => message.role === "assistant");
+          const timestamp = new Date(userMessage.created_at);
+          restoredRows.push({
+            id: String(userMessage.id),
+            question: userMessage.content,
+            time: `${timestamp.getHours()}:${String(timestamp.getMinutes()).padStart(2, "0")}`,
+            systems: assistantMessage?.metadata?.systems,
+          });
+        }
+
+        setConversationId(conversation.id);
+        setRows(restoredRows);
+      } catch {
+        setConversationId(null);
+        setRows([]);
+      } finally {
+        setLoadingConversation(false);
+      }
+    };
+
+    loadConversation();
+  }, [selectedConversationId]);
+
+  const ask = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const question = input.trim();
+    if (!question || loadingRowId) return;
+
     const now = new Date();
-    const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
-    setTyping(true);
+    const rowId = crypto.randomUUID();
+    const row: ResultRow = {
+      id: rowId,
+      question,
+      time: `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`,
+    };
+
+    setRows((current) => [...current, row]);
+    setInput("");
+    setLoadingRowId(rowId);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/chat`, {
+      const response = await fetch(`${API_URL}/chat/compare-systems`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text,
-          top_k: settingsOverride.topK,
-          similarity_threshold: settingsOverride.similarityThreshold,
-          temperature: settingsOverride.temperature ?? 0.3,
-          mode: settingsOverride.mode,
+          message: question,
+          top_k: settings.topK,
+          similarity_threshold: settings.similarityThreshold,
+          temperature: settings.temperature,
           source_file: docFilter ?? null,
+          conversation_id: conversationId,
         }),
       });
-
-      const data = await response.json();
-
-      if (settingsOverride.mode === "compare") {
-        setMessages((m) => [
-          ...m,
-          {
-            id: crypto.randomUUID(),
-            role: "bot",
-            mode: "compare",
-            aiText: data.ai_response ?? "No AI response.",
-            corpusText: data.corpus_response ?? "",
-            chunks: data.chunks ?? [],
-            sources: data.sources ?? [],
-            time,
-          },
-        ]);
-      } else {
-        setMessages((m) => [
-          ...m,
-          {
-            id: crypto.randomUUID(),
-            role: "bot",
-            mode: settingsOverride.mode,
-            text: data.response ?? "Sorry, I couldn't process that.",
-            sources: data.sources ?? [],
-            time,
-          },
-        ]);
+      const data: CompareResponse = await response.json();
+      if (!response.ok) {
+        throw new Error("The backend could not process this question.");
       }
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
+        router.replace(`/?conversation=${data.conversation_id}`, { scroll: false });
+        window.dispatchEvent(new Event("conversation-updated"));
+      }
+      setRows((current) =>
+        current.map((item) =>
+          item.id === rowId
+            ? { ...item, systems: data.systems }
+            : item,
+        ),
+      );
     } catch {
-      setMessages((m) => [
-        ...m,
-        {
-          id: crypto.randomUUID(),
-          role: "bot",
-          mode: settingsOverride.mode,
-          text: "Error connecting to the study assistant backend.",
-          time,
-        },
-      ]);
+      setRows((current) =>
+        current.map((item) =>
+          item.id === rowId
+            ? { ...item, error: "Could not connect to the backend comparison endpoint." }
+            : item,
+        ),
+      );
     } finally {
-      setTyping(false);
+      setLoadingRowId(null);
     }
   };
 
-  /** Called when user submits a new question */
-  const send = async (text: string) => {
-    if (!text.trim()) return;
-    const now = new Date();
-    const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
-    lastQuestionRef.current = text;
-    setMessages((m) => [...m, { id: crypto.randomUUID(), role: "user", text, time }]);
-    setInput("");
-    await fetchResponse(text, ragSettings);
-  };
-
-  /** Called when mode changes — re-fetches last question silently */
-  const switchMode = (newMode: ResponseMode) => {
-    const newSettings = { ...ragSettings, mode: newMode };
-    setRagSettings(newSettings);
-    if (lastQuestionRef.current && !typing) {
-      fetchResponse(lastQuestionRef.current, newSettings);
-    }
-  };
-
-  /** Called from settings panel for any setting change */
-  const handleSettingsChange = (newSettings: RAGSettings) => {
-    setRagSettings(newSettings);
-    // If mode changed and there's a prior question, re-fetch
-    if (newSettings.mode !== ragSettings.mode && lastQuestionRef.current && !typing) {
-      fetchResponse(lastQuestionRef.current, newSettings);
-    }
-  };
+  const latestRow = rows.at(-1);
+  const loading = latestRow ? loadingRowId === latestRow.id : false;
 
   return (
-    <div className={`flex flex-col h-full min-w-0 ${showSettings ? 'overflow-hidden' : ''}`}>
-      {/* Top bar */}
-      <header className="h-16 md:h-20 flex items-center justify-between px-4 md:px-10 border-b border-border bg-card shrink-0">
-        <div>
-          <h1 className="font-display text-sm sm:text-base md:text-xl font-bold tracking-tight">Good morning, Shahrina.</h1>
-          {docFilter && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <FileText className="h-3 w-3 text-primary shrink-0" />
-              <span className="text-[10px] md:text-[11px] text-primary font-medium truncate max-w-[150px] sm:max-w-[260px]">
-                Scoped to: {docFilter}
-              </span>
+    <div className="flex h-full min-w-0 flex-col bg-secondary">
+      <header className="shrink-0 border-b border-border bg-card px-4 py-4 md:px-8">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <h1 className="font-display text-lg font-bold tracking-normal">MindBridge-RAG Evaluation</h1>
+                <p className="text-xs text-muted-foreground">S0 · Corpus · S1 · S2</p>
+              </div>
             </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* Mode indicator */}
-          <span className={`font-display text-[9px] md:text-[10px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-full uppercase tracking-tight ${modeBadge.color}`}>
-            {modeBadge.label} Mode
-          </span>
-          {/* Settings toggle */}
-          <button
-            onClick={() => setShowSettings((v) => !v)}
-            className="h-9 w-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground shadow-md z-50"
-            title="RAG Settings"
-          >
-            <Settings2 className="h-4 w-4" />
-          </button>
-          <div className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-secondary rounded-full">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            <span className="font-display text-xs font-bold text-foreground/70 uppercase tracking-tight">
-              RAG &bull; Mistral
-            </span>
+            {docFilter && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                <FileText className="h-3.5 w-3.5" />
+                {docFilter}
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 xl:w-[560px]">
+            <SettingSlider
+              label="Top K"
+              value={settings.topK}
+              min={1}
+              max={20}
+              step={1}
+              onChange={(topK) => setSettings((current) => ({ ...current, topK }))}
+            />
+            <SettingSlider
+              label="Similarity"
+              value={settings.similarityThreshold}
+              min={0}
+              max={1}
+              step={0.05}
+              format={(value) => value.toFixed(2)}
+              onChange={(similarityThreshold) =>
+                setSettings((current) => ({ ...current, similarityThreshold }))
+              }
+            />
+            <SettingSlider
+              label="Temp"
+              value={settings.temperature}
+              min={0}
+              max={1.5}
+              step={0.05}
+              format={(value) => value.toFixed(2)}
+              onChange={(temperature) => setSettings((current) => ({ ...current, temperature }))}
+            />
           </div>
         </div>
       </header>
 
-      {/* Mobile backdrop — rendered outside the dashboard surface so it's never hidden */}
-      {showSettings && (
-        <div
-          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setShowSettings(false)}
-        />
-      )}
-
-      {/* Settings Panel — rendered outside the dashboard surface so conditional hide doesn't affect it */}
-      {showSettings && (
-        <aside className="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-card border-l border-border shadow-2xl flex flex-col overflow-y-auto lg:hidden">
-          <SettingsPanel
-            settings={ragSettings}
-            onChange={handleSettingsChange}
-            onClose={() => setShowSettings(false)}
-          />
-        </aside>
-      )}
-
-      {/* Dashboard surface */}
-      <div className="flex-1 flex flex-col lg:flex-row p-3 md:p-6 gap-6 overflow-hidden relative">
-        {/* Chat centerpiece — hidden on mobile when settings open to prevent double-page effect */}
-        <section className={`flex-[2.5] flex flex-col bg-card rounded-2xl border border-border shadow-sm overflow-hidden min-w-0 ${showSettings ? 'hidden lg:flex' : ''}`}>
-          <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            {/* Messages */}
-            <div className="space-y-6">
-              {messages.map((m) =>
-                m.role === "user" ? (
-                  <div key={m.id} className="flex justify-end">
-                    <div className="max-w-[85%] sm:max-w-[80%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3">
-                      <p className="text-[14px] sm:text-[15px] leading-relaxed">{m.text}</p>
-                      <p className="font-display text-[10px] mt-1 text-primary-foreground/70 text-right">
-                        {m.time}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <BotMessage key={m.id} message={m} />
-                ),
-              )}
-
-              {typing && (
-                <div className="flex gap-4">
-                  <div className="h-9 w-9 shrink-0 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                    <Zap className="h-5 w-5" />
-                  </div>
-                  <div className="rounded-2xl rounded-tl-sm bg-secondary/60 border border-border/60 px-4 py-3 flex gap-1 items-center">
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "120ms" }} />
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: "240ms" }} />
-                  </div>
-                </div>
-              )}
-
-              {messages.length === 0 && !typing && (
-                <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary grid place-items-center">
-                    <BookOpen className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="font-display text-sm font-bold text-foreground/70">
-                      {docFilter ? `Chatting with ${docFilter}` : "Ask anything from your notes"}
-                    </p>
-                    <p className="text-[12px] text-muted-foreground mt-1">
-                      {docFilter
-                        ? "Questions will be answered using only this document."
-                        : "Use the settings panel to switch modes and tune retrieval parameters."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div ref={endRef} />
-            </div>
-          </div>
-
-          {/* Composer */}
-          <div className="p-4 md:p-6 pt-0">
-            {/* Quick mode switcher strip */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <div className="flex gap-1.5">
-                {(["ai", "corpus", "compare"] as ResponseMode[]).map((m) => {
-                  const Icon = m === "ai" ? Brain : m === "corpus" ? Database : GitCompare;
-                  const labels = { ai: "AI", corpus: "Corpus", compare: "Compare" };
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => switchMode(m)}
-                      disabled={typing}
-                      className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-display font-bold uppercase tracking-tight transition-all disabled:opacity-50 ${
-                        ragSettings.mode === m
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "bg-secondary text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Icon className="h-3 w-3" />
-                      <span>{labels[m]}</span>
-                    </button>
-                  );
-                })}
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="mx-auto flex max-w-[1800px] flex-col gap-4">
+          {latestRow && (
+            <div className="rounded-lg border border-border bg-card px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{latestRow.question}</p>
+                <span className="font-display text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  {latestRow.time}
+                </span>
               </div>
-              <span className="ml-auto font-display text-[9px] sm:text-[10px] text-muted-foreground self-center">
-                K={ragSettings.topK} · sim≥{ragSettings.similarityThreshold.toFixed(2)}
-              </span>
+              {latestRow.error && (
+                <p className="mt-2 text-xs text-destructive">{latestRow.error}</p>
+              )}
             </div>
+          )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send(input);
-              }}
-              className="relative flex items-center"
-            >
-              <Paperclip className="absolute left-4 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send(input);
-                  }
-                }}
-                rows={1}
-                placeholder="Ask anything from your notes…"
-                className="w-full h-14 pl-12 pr-16 bg-secondary/60 border border-border rounded-2xl text-[14px] sm:text-sm resize-none outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all py-4"
+          {!latestRow && !loadingConversation && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <p className="text-sm font-semibold">Ask a benchmark-style student question to compare all systems.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The four columns match the required project comparison: S0, research corpus, S1, and S2.
+              </p>
+            </div>
+          )}
+
+          {loadingConversation && (
+            <div className="flex min-h-40 items-center justify-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+            {columns.map((column) => (
+              <SystemPanel
+                key={column.key}
+                config={column}
+                result={latestRow?.systems?.[column.key]}
+                loading={loading}
               />
-              <button
-                type="submit"
-                disabled={!input.trim() || typing}
-                className="absolute right-3 w-10 h-10 bg-primary text-primary-foreground rounded-xl flex items-center justify-center hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-40 disabled:shadow-none"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </form>
-            <p className="font-display text-center text-[9px] sm:text-[10px] text-muted-foreground mt-3 uppercase tracking-tight">
-              Study Planner grounds every claim with citations from your uploads.
-            </p>
+            ))}
           </div>
-        </section>
 
-        {/* Desktop settings panel (inside dashboard surface for side-by-side layout) */}
-        {showSettings && (
-          <aside className="hidden lg:flex lg:w-72 shrink-0 flex-col">
-            <SettingsPanel
-              settings={ragSettings}
-              onChange={handleSettingsChange}
-              onClose={() => setShowSettings(false)}
-            />
-          </aside>
-        )}
-      </div>
+          {rows.length > 1 && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h2 className="font-display text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Previous Questions
+              </h2>
+              <div className="mt-3 grid gap-2">
+                {rows.slice(0, -1).reverse().map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => setRows((current) => [...current.filter((item) => item.id !== row.id), row])}
+                    className="rounded-md bg-secondary px-3 py-2 text-left text-xs font-medium text-foreground/80 hover:bg-secondary/70"
+                  >
+                    {row.question}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+      </main>
+
+      <form onSubmit={ask} className="shrink-0 border-t border-border bg-card p-4 md:px-8">
+        <div className="mx-auto flex max-w-[1800px] items-end gap-3">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                ask();
+              }
+            }}
+            rows={2}
+            placeholder="Ask a student wellbeing or academic support question..."
+            className="min-h-14 flex-1 resize-none rounded-lg border border-border bg-secondary/60 px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || Boolean(loadingRowId)}
+            className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-40"
+            title="Send"
+          >
+            {loadingRowId ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

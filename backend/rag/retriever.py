@@ -1,7 +1,6 @@
 import json
 
 from rag.db import db
-from rag.in_memory_db import memory_db
 
 
 class Retriever:
@@ -12,35 +11,23 @@ class Retriever:
         similarity_threshold: float = 0.0,
         source_file: str | None = None,
     ) -> list[dict]:
-        from rag.embedder import embedder
-
-        if not db.pool:
-            query_embedding = embedder.embed(query)
-            results = memory_db.search(query_embedding, top_k)
-            if similarity_threshold > 0:
-                results = [
-                    result
-                    for result in results
-                    if result.get("similarity", 1.0) >= similarity_threshold
-                ]
-            if source_file:
-                results = [
-                    result
-                    for result in results
-                    if result["source_file"] == source_file
-                ]
-            return results
+        if not db.pool or not db.vector_enabled:
+            raise RuntimeError("PostgreSQL with pgvector is not available.")
 
         try:
-            query_embedding = embedder.embed(query)
+            from rag.embedder import embedder
+
+            query_embedding = await embedder.embed(query)
             async with db.pool.acquire() as conn:
                 if source_file:
                     rows = await conn.fetch(
                         """
-                        SELECT id, source_file, content,
+                        SELECT id, chunk_id, source_file, content, category,
+                               risk_level, language,
                                1 - (embedding <=> $1::vector) AS similarity
-                        FROM legal_chunks
+                        FROM corpus_chunks
                         WHERE source_file = $4
+                          AND embedding IS NOT NULL
                           AND 1 - (embedding <=> $1::vector) >= $3
                         ORDER BY embedding <=> $1::vector
                         LIMIT $2
@@ -53,10 +40,12 @@ class Retriever:
                 else:
                     rows = await conn.fetch(
                         """
-                        SELECT id, source_file, content,
+                        SELECT id, chunk_id, source_file, content, category,
+                               risk_level, language,
                                1 - (embedding <=> $1::vector) AS similarity
-                        FROM legal_chunks
-                        WHERE 1 - (embedding <=> $1::vector) >= $3
+                        FROM corpus_chunks
+                        WHERE embedding IS NOT NULL
+                          AND 1 - (embedding <=> $1::vector) >= $3
                         ORDER BY embedding <=> $1::vector
                         LIMIT $2
                         """,
@@ -65,9 +54,8 @@ class Retriever:
                         similarity_threshold,
                     )
                 return [dict(r) for r in rows]
-        except Exception as e:
-            print(f"Error during retrieval: {e}")
-            return []
+        except Exception as error:
+            raise RuntimeError("pgvector retrieval failed.") from error
 
 
 retriever = Retriever()

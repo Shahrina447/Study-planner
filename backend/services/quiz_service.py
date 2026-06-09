@@ -1,10 +1,8 @@
 import json
-import random
 
 from api.schemas import QuizGenerateRequest
 from config import settings
 from rag.db import db
-from rag.in_memory_db import memory_db
 from services.orchestrator import orchestrator
 
 
@@ -67,25 +65,33 @@ class QuizService:
             }
 
     async def _get_sample_chunks(self, source_file: str | None) -> list[dict]:
-        if db.pool:
-            async with db.pool.acquire() as conn:
-                if source_file:
-                    rows = await conn.fetch(
-                        "SELECT content FROM legal_chunks WHERE source_file = $1 ORDER BY random() LIMIT 20",
-                        source_file,
-                    )
-                else:
-                    rows = await conn.fetch(
-                        "SELECT content FROM legal_chunks ORDER BY random() LIMIT 20"
-                    )
-                return [{"content": row["content"]} for row in rows]
+        if not db.pool or not db.vector_enabled:
+            raise RuntimeError("PostgreSQL with pgvector is not available.")
 
-        pool = [
-            chunk
-            for chunk in memory_db.chunks
-            if not source_file or chunk["source_file"] == source_file
-        ]
-        return random.sample(pool, min(20, len(pool)))
+        async with db.pool.acquire() as conn:
+            if source_file:
+                rows = await conn.fetch(
+                    """
+                    SELECT content
+                    FROM corpus_chunks
+                    WHERE source_file = $1
+                      AND embedding IS NOT NULL
+                    ORDER BY random()
+                    LIMIT 20
+                    """,
+                    source_file,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT content
+                    FROM corpus_chunks
+                    WHERE embedding IS NOT NULL
+                    ORDER BY random()
+                    LIMIT 20
+                    """
+                )
+            return [{"content": row["content"]} for row in rows]
 
     def _is_meaningful(self, text: str) -> bool:
         stripped = text.strip()

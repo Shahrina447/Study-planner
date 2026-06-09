@@ -43,7 +43,7 @@ export default function StressPage() {
           <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Stress · score 34/100</p>
           <h1 className="text-4xl md:text-5xl mt-2">Take a slow breath.</h1>
           <p className="text-muted-foreground mt-3 max-w-xl">
-            Atlas noticed three rapid-fire questions in the last 12 minutes. That's often a signal of rising stress. Try
+            MindBridge-RAG noticed three rapid-fire questions in the last 12 minutes. That's often a signal of rising stress. Try
             the 4-7-8 cycle below.
           </p>
         </header>
@@ -84,7 +84,7 @@ export default function StressPage() {
               <Coffee className="h-5 w-5 text-[var(--color-ember)] mb-3" />
               <h3 className="font-display text-2xl mb-2">Take a 12-minute break</h3>
               <p className="text-sm text-muted-foreground">
-                Walk away from the screen. Make tea. Let your eyes find the horizon. Atlas will pause your timer.
+                Walk away from the screen. Make tea. Let your eyes find the horizon. MindBridge-RAG will pause your timer.
               </p>
               <button className="mt-4 text-sm text-foreground underline underline-offset-4">Start break →</button>
             </div>
@@ -100,7 +100,7 @@ export default function StressPage() {
             </div>
 
             <div className="rounded-2xl border border-border bg-accent/30 p-6">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-accent-foreground/70 mb-2">A note from Atlas</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-accent-foreground/70 mb-2">A note from MindBridge-RAG</p>
               <p className="text-sm text-foreground italic leading-relaxed">
                 &quot;You've been showing up daily for 8 days straight. Progress isn't always about intensity — it's
                 about not breaking the chain.&quot;

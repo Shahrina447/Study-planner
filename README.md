@@ -1,7 +1,7 @@
-# Atlas — Study Planner
+# MindBridge-RAG Study Planner
 
-**Chat with your own notes.**
-A RAG-powered study assistant that grounds every answer in your uploaded course materials.
+An asynchronous safety-aware RAG assistant for student wellbeing and academic
+support, with S0, S1, and S2 comparison.
 
 **Stack:** Next.js 15 · React 19 · Tailwind CSS v4 · FastAPI · Mistral AI · sentence-transformers
 
@@ -39,10 +39,9 @@ atlas/
 │   ├── main.py                   # App entry point & route handlers
 │   ├── config.py                 # Pydantic settings (reads .env)
 │   ├── rag/
-│   │   ├── embedder.py           # SentenceTransformer singleton
-│   │   ├── retriever.py          # Cosine similarity search
-│   │   ├── db.py                 # asyncpg PostgreSQL pool
-│   │   └── in_memory_db.py       # In-memory fallback vector store
+│   │   ├── embedder.py           # Async SentenceTransformer wrapper
+│   │   ├── retriever.py          # pgvector cosine similarity search
+│   │   └── db.py                 # asyncpg PostgreSQL/pgvector pool
 │   ├── services/
 │   │   ├── orchestrator.py       # AI / corpus / compare pipelines
 │   │   └── pdf_extractor.py      # PyMuPDF text extraction
@@ -52,6 +51,10 @@ atlas/
 │   ├── .env.example
 │   └── pyproject.toml
 │
+├── backend/data/                 # Integrated MindBridge CSV files
+├── mindbridge_rag_templates/     # Required group submission templates
+├── requirements/                 # Official project manual
+├── REQUIREMENTS_COMPLIANCE.md
 ├── .gitignore
 └── README.md
 ```
@@ -84,7 +87,7 @@ Adaptive Study Planning + Stress Monitoring
 - Node.js 18+
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) — Python package manager
-- PostgreSQL with pgvector *(optional — falls back to in-memory store)*
+- PostgreSQL with pgvector *(required)*
 
 ---
 
@@ -123,7 +126,7 @@ uv run uvicorn main:app --reload
 |---|---|---|
 | `MISTRAL_API_KEY` | Yes | Your Mistral AI API key |
 | `MISTRAL_MODEL` | No | Model name (default: `mistral-small-latest`) |
-| `DATABASE_URL` | No | PostgreSQL connection string (omit for in-memory store) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string with pgvector available |
 | `CORS_ORIGIN` | No | Frontend origin (default: `http://localhost:3000`) |
 
 ---
@@ -160,9 +163,22 @@ uv run python scripts/ingest.py
 | Backend framework | FastAPI |
 | LLM | Mistral AI |
 | Embeddings | `all-MiniLM-L6-v2` via sentence-transformers |
-| Vector store | PostgreSQL + pgvector (in-memory fallback) |
+| Vector store | PostgreSQL + pgvector |
+| Database access | asyncpg |
 | Python package manager | uv |
 
 ---
 
-> Atlas is a study aid. Always verify critical information against your original course materials before exams.
+## Dataset Validation
+
+```bash
+cd backend
+uv run python scripts/build_mindbridge_dataset.py
+uv run python scripts/validate_mindbridge_dataset.py
+uv run python scripts/embed_corpus.py
+```
+
+See `REQUIREMENTS_COMPLIANCE.md` for completed and human-owned deliverables.
+
+> MindBridge-RAG is an educational support tool, not a medical, therapy, or
+> emergency service.

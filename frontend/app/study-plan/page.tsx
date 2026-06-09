@@ -2,7 +2,7 @@ import { AppShell } from "../../src/components/AppShell";
 import { CheckCircle2, Circle, Clock, Flame } from "lucide-react";
 
 export const metadata = {
-  title: "Study Plan — Atlas",
+  title: "Study Plan — MindBridge-RAG",
   description: "Today's topics, deadlines, and adaptive scheduling.",
 };
 
@@ -27,7 +27,7 @@ export default function StudyPlanPage() {
           <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Wednesday · June 3</p>
           <h1 className="text-4xl md:text-5xl mt-2">Today, gently.</h1>
           <p className="text-muted-foreground mt-3 max-w-xl">
-            Four focus blocks. 3h 5m of deep work. Atlas spaced them around your peak hours and reserved a long break
+            Four focus blocks. 3h 5m of deep work. MindBridge-RAG spaced them around your peak hours and reserved a long break
             after lunch.
           </p>
         </header>

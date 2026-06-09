@@ -34,3 +34,13 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     await db.disconnect()
+
+
+if __name__ == "__main__":
+    import uvicor
+    uvicorn.run(
+        app,
+        host="localhost",
+        port=8000,
+        reload=True
+    )

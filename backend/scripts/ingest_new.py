@@ -39,29 +39,16 @@ async def main():
         print("❌  Could not connect to PostgreSQL. Exiting.")
         return
 
-    # Ensure table + extension exist
     async with db.pool.acquire() as conn:
-        await conn.execute("""
-            CREATE EXTENSION IF NOT EXISTS vector;
-            CREATE TABLE IF NOT EXISTS legal_chunks (
-                id SERIAL PRIMARY KEY,
-                source_file TEXT NOT NULL,
-                chunk_index INTEGER NOT NULL,
-                content TEXT NOT NULL,
-                embedding vector(384),
-                doc_type TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            );
-        """)
-
         # Fetch already-indexed filenames
-        rows = await conn.fetch("SELECT DISTINCT source_file FROM legal_chunks")
+        rows = await conn.fetch("SELECT DISTINCT source_file FROM corpus_chunks")
         indexed = {r["source_file"] for r in rows}
 
     print(f"Already indexed: {indexed}\n")
 
     # Find PDFs not yet indexed
-    all_pdfs = [f for f in os.listdir(STUDY_MATERIALS_DIR) if f.lower().endswith(".pdf")]
+    filenames = await asyncio.to_thread(os.listdir, STUDY_MATERIALS_DIR)
+    all_pdfs = [f for f in filenames if f.lower().endswith(".pdf")]
     new_pdfs = [f for f in all_pdfs if f not in indexed]
 
     if not new_pdfs:
@@ -75,7 +62,7 @@ async def main():
         path = os.path.join(STUDY_MATERIALS_DIR, filename)
         print(f"📄  Processing {filename} …")
 
-        text = extract_pdf_text(path)
+        text = await asyncio.to_thread(extract_pdf_text, path)
         text = text.replace("\x00", "")
         if not text.strip():
             print(f"   ⚠  No text extracted — skipping.")
@@ -84,17 +71,26 @@ async def main():
         chunks = [c for c in chunk_by_words(text) if c.strip()]
         print(f"   {len(chunks)} chunks created")
 
+        embeddings = await embedder.embed_many(chunks)
         async with db.pool.acquire() as conn:
-            for i, chunk in enumerate(chunks):
-                chunk = chunk.replace("\x00", "")
-                emb = embedder.embed(chunk)
-                await conn.execute(
-                    """
-                    INSERT INTO legal_chunks (source_file, chunk_index, content, embedding, doc_type)
+            await conn.executemany(
+                """
+                    INSERT INTO corpus_chunks (source_file, chunk_index, content, embedding, doc_type)
                     VALUES ($1, $2, $3, $4::vector, $5)
-                    """,
-                    filename, i, chunk, json.dumps(emb), "study_material",
-                )
+                """,
+                [
+                    (
+                        filename,
+                        index,
+                        chunk.replace("\x00", ""),
+                        json.dumps(embedding),
+                        "study_material",
+                    )
+                    for index, (chunk, embedding) in enumerate(
+                        zip(chunks, embeddings, strict=True)
+                    )
+                ],
+            )
 
         print(f"   ✅  {filename} ingested ({len(chunks)} chunks)\n")
 
