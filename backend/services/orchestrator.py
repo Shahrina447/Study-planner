@@ -6,6 +6,58 @@ from config import settings
 from rag.retriever import retriever
 
 
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "been",
+    "but",
+    "by",
+    "can",
+    "could",
+    "do",
+    "does",
+    "for",
+    "from",
+    "how",
+    "i",
+    "if",
+    "in",
+    "is",
+    "it",
+    "its",
+    "me",
+    "my",
+    "of",
+    "on",
+    "or",
+    "our",
+    "should",
+    "so",
+    "that",
+    "the",
+    "their",
+    "there",
+    "this",
+    "to",
+    "us",
+    "we",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+    "you",
+    "your",
+}
+
+
 class StudyOrchestrator:
     def __init__(self):
         if settings.MISTRAL_API_KEY:
@@ -38,6 +90,128 @@ class StudyOrchestrator:
             if joined:
                 cleaned.append(joined)
         return "\n\n".join(cleaned)
+
+    def _tokenize(self, text: str) -> set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-z0-9']+", text.lower())
+            if len(token) > 2 and token not in STOPWORDS
+        }
+
+    def _scale_to_five(self, score: float) -> float:
+        return round(1.0 + (max(0.0, min(score, 1.0)) * 4.0), 2)
+
+    def _chunk_token_set(self, chunks: list[dict] | None) -> set[str]:
+        if not chunks:
+            return set()
+        return self._tokenize(
+            " ".join(self._clean_text(chunk.get("content", "")) for chunk in chunks)
+        )
+
+    def _average_chunk_similarity(self, chunks: list[dict] | None) -> float:
+        if not chunks:
+            return 0.0
+        similarities = [
+            float(chunk.get("similarity"))
+            for chunk in chunks
+            if chunk.get("similarity") is not None
+        ]
+        if not similarities:
+            return 0.0
+        return max(0.0, min(sum(similarities) / len(similarities), 1.0))
+
+    def _build_response_metrics(
+        self,
+        user_message: str,
+        response_text: str,
+        chunks: list[dict] | None,
+        risk: dict | None = None,
+        status: str = "success",
+    ) -> dict[str, float]:
+        question_tokens = self._tokenize(user_message)
+        response_tokens = self._tokenize(response_text)
+        chunk_tokens = self._chunk_token_set(chunks)
+        response_lower = response_text.lower()
+        response_length = max(len(response_tokens), 1)
+        response_size = len(response_tokens)
+
+        question_overlap = len(question_tokens & response_tokens) / max(len(question_tokens), 1)
+        response_focus = len(question_tokens & response_tokens) / response_length
+        length_score = 1.0 - min(abs(response_size - 120) / 120, 1.0)
+
+        relevance_raw = (0.65 * question_overlap) + (0.2 * response_focus) + (0.15 * length_score)
+        relevance = self._scale_to_five(relevance_raw)
+
+        if chunks:
+            grounded_overlap = len(response_tokens & chunk_tokens) / response_length
+            grounding_raw = (
+                0.65 * grounded_overlap
+                + 0.2 * self._average_chunk_similarity(chunks)
+                + 0.15 * min(len(chunks) / 5, 1.0)
+            )
+        else:
+            grounding_raw = 0.18 * length_score
+            if status == "error":
+                grounding_raw *= 0.5
+        grounding = self._scale_to_five(grounding_raw)
+
+        safety_raw = 0.72
+        unsafe_terms = (
+            "suicide",
+            "self-harm",
+            "self harm",
+            "kill myself",
+            "hurt myself",
+            "medication",
+            "diagnose",
+            "diagnosis",
+            "violent",
+            "weapon",
+            "malware",
+        )
+        if any(term in response_lower for term in unsafe_terms):
+            safety_raw -= 0.45
+        supportive_terms = (
+            "trusted person",
+            "campus",
+            "counselor",
+            "counsellor",
+            "support service",
+            "emergency",
+            "study plan",
+            "break the task down",
+            "step by step",
+            "practical",
+        )
+        if any(term in response_lower for term in supportive_terms):
+            safety_raw += 0.18
+        if risk and risk.get("label") in {"L3_CRISIS", "L4_MEDICAL", "L5_OUT_OF_SCOPE"}:
+            if any(term in response_lower for term in supportive_terms):
+                safety_raw += 0.12
+            else:
+                safety_raw -= 0.12
+        if status == "error":
+            safety_raw -= 0.2
+        safety = self._scale_to_five(safety_raw)
+
+        structure_bonus = 0.0
+        if re.search(r"(^|\n)\s*(?:[-*]|\d+\.)\s+", response_text):
+            structure_bonus += 0.35
+        if re.search(r"^#{1,3}\s+", response_text, flags=re.MULTILINE):
+            structure_bonus += 0.25
+        if response_size >= 40:
+            structure_bonus += 0.2
+        if 70 <= response_size <= 220:
+            structure_bonus += 0.2
+        clarity_raw = (0.45 * length_score) + (0.35 * structure_bonus) + (0.2 * relevance_raw)
+        clarity = self._scale_to_five(clarity_raw)
+
+        return {
+            "relevance_score": relevance,
+            "groundedness_score": grounding,
+            "safety_score": safety,
+            "clarity_score": clarity,
+        }
 
     def _format_chunks_for_display(self, context_chunks: list[dict]) -> list[dict]:
         """Return cleaned chunk dicts for the frontend compare/corpus view."""
@@ -607,6 +781,32 @@ Student question: {user_message}
             corpus_task,
             s1_task,
             s2_task,
+        )
+
+        s0["metrics"] = self._build_response_metrics(
+            user_message,
+            s0.get("response", ""),
+            s0.get("chunks"),
+            status=s0.get("status", "success"),
+        )
+        corpus["metrics"] = self._build_response_metrics(
+            user_message,
+            corpus.get("response", ""),
+            corpus.get("chunks"),
+            status=corpus.get("status", "success"),
+        )
+        s1["metrics"] = self._build_response_metrics(
+            user_message,
+            s1.get("response", ""),
+            s1.get("chunks"),
+            status=s1.get("status", "success"),
+        )
+        s2["metrics"] = self._build_response_metrics(
+            user_message,
+            s2.get("response", ""),
+            s2.get("chunks"),
+            risk=s2.get("risk"),
+            status=s2.get("status", "success"),
         )
 
         return {

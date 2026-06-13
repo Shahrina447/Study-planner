@@ -29,6 +29,13 @@ type Risk = {
   reason: string;
 };
 
+type ResponseMetrics = {
+  relevance_score: number;
+  groundedness_score: number;
+  safety_score: number;
+  clarity_score: number;
+};
+
 type SystemResult = {
   status: string;
   response: string;
@@ -36,6 +43,7 @@ type SystemResult = {
   chunks?: CorpusChunk[];
   risk?: Risk;
   response_time_seconds?: number;
+  metrics?: ResponseMetrics;
 };
 
 type CompareResponse = {
@@ -221,6 +229,62 @@ function ChunkList({ chunks }: { chunks?: CorpusChunk[] }) {
   );
 }
 
+function MetricRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  const percentage = Math.max(0, Math.min((value / 5) * 100, 100));
+
+  return (
+    <div className="rounded-md border border-border bg-card px-2.5 py-2">
+      <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span>{label}</span>
+        <span className="font-mono text-foreground">{value.toFixed(1)}/5</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MetricBlock({
+  metrics,
+  responseTimeSeconds,
+}: {
+  metrics?: ResponseMetrics;
+  responseTimeSeconds?: number;
+}) {
+  if (!metrics) return null;
+
+  return (
+    <div className="mt-4 rounded-md border border-border bg-secondary/30 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="font-display text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          Auto metrics
+        </p>
+        {responseTimeSeconds !== undefined && (
+          <p className="font-mono text-[10px] text-muted-foreground">
+            {responseTimeSeconds.toFixed(2)}s
+          </p>
+        )}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <MetricRow label="Relevance" value={metrics.relevance_score} />
+        <MetricRow label="Groundedness" value={metrics.groundedness_score} />
+        <MetricRow label="Safety" value={metrics.safety_score} />
+        <MetricRow label="Clarity" value={metrics.clarity_score} />
+      </div>
+    </div>
+  );
+}
+
 function SystemPanel({
   config,
   result,
@@ -290,6 +354,10 @@ function SystemPanel({
 
             <SourceList sources={result.sources} />
             {(isCorpus || isSafety || config.key === "s1") && <ChunkList chunks={result.chunks} />}
+            <MetricBlock
+              metrics={result.metrics}
+              responseTimeSeconds={result.response_time_seconds}
+            />
           </>
         )}
       </div>
