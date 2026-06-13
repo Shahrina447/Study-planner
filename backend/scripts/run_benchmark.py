@@ -2,14 +2,18 @@
 
 import asyncio
 import csv
+import sys
 from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(BACKEND_DIR))
 
 from config import settings
 from rag.db import db
 from services.orchestrator import orchestrator
 
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = BACKEND_DIR / "data"
 
 
 def load_questions(limit: int = 15) -> list[dict]:

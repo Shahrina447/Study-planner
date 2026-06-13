@@ -264,12 +264,14 @@ Student question: {user_message}
             user_message, top_k, similarity_threshold, source_file
         )
         sources = list(set(c["source_file"] for c in chunks))
+        display_chunks = self._format_chunks_for_display(chunks)
 
         if not self.client:
             return {
                 "status": "error",
                 "response": "MISTRAL_API_KEY is missing in backend/.env",
                 "sources": sources,
+                "chunks": display_chunks,
             }
 
         try:
@@ -284,9 +286,15 @@ Student question: {user_message}
                 "status": "success",
                 "response": resp.choices[0].message.content,
                 "sources": sources,
+                "chunks": display_chunks,
             }
         except Exception as e:
-            return {"status": "error", "response": f"Mistral error: {e}", "sources": sources}
+            return {
+                "status": "error",
+                "response": f"Mistral error: {e}",
+                "sources": sources,
+                "chunks": display_chunks,
+            }
 
     async def basic_chatbot(
         self,

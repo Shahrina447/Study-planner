@@ -1,51 +1,34 @@
-# MindBridge-RAG Template Pack
+# MindBridge-RAG Group G06 Submission
 
-This folder contains the required submission templates for each group.
+**Topic:** Study planning
+**Submission date:** June 9, 2026
 
-## Required files
+## Included Files
 
-1. `1_sources.csv`
-2. `2_corpus_chunks.csv`
-3. `3_benchmark_questions.csv`
-4. `4_ideal_answers.csv`
-5. `5_risk_labels.csv`
-6. `6_model_responses.csv`
-7. `7_human_evaluation.csv`
-8. `group_report.md`
+| File | Status |
+|---|---|
+| `1_sources.csv` | Complete: 7 sources |
+| `2_corpus_chunks.csv` | Complete: 50 validated chunks |
+| `3_benchmark_questions.csv` | Complete: 50 questions |
+| `4_ideal_answers.csv` | Complete: 50 linked answers |
+| `5_risk_labels.csv` | Complete: 50 linked labels |
+| `6_model_responses.csv` | Complete: 45 real S0/S1/S2 responses |
+| `7_human_evaluation.csv` | Prepared: 45 rows awaiting independent human scores |
+| `group_report.md` | Complete with verified project results |
+| `presentation_outline.md` | Complete 10-slide outline |
 
-## Risk labels
+## Validation
 
-Use only these labels:
+- Unique chunk and question IDs
+- Exact required CSV headers
+- Corpus chunks contain 80–150 words
+- Every question links to one ideal answer and risk label
+- System types use only `S0`, `S1`, and `S2`
+- Real response latency and retrieved chunk IDs are recorded
 
-- `L0_NORMAL`: Normal study or academic support
-- `L1_STRESS`: Mild stress, worry, nervousness
-- `L2_DISTRESS`: Strong emotional distress or hopelessness
-- `L3_CRISIS`: Self-harm, suicide, violence, immediate danger
-- `L4_MEDICAL`: Diagnosis, medication, clinical treatment request
-- `L5_OUT_OF_SCOPE`: Not related to student support
+## Human Evaluation
 
-## System types
-
-Use only these values in `6_model_responses.csv` and `7_human_evaluation.csv`:
-
-- `S0`: Basic chatbot without RAG
-- `S1`: Basic RAG
-- `S2`: Safety-aware RAG
-
-## Minimum per group
-
-- 3 safe sources
-- 30 corpus chunks
-- 30 benchmark questions
-- 30 ideal answers
-- 30 risk labels
-- 15 evaluated model responses
-- 1 group report
-
-## Safety rules
-
-- Do not include private real student stories.
-- Do not include medical diagnosis or medication advice.
-- Do not write therapy or treatment instructions.
-- Use safe, general, student-support language.
-- Crisis examples must be synthetic and handled with safe escalation language.
+The evaluation worksheet is fully mapped to tested responses. A human evaluator
+must enter scores from 1–5 and set `unsafe_flag` to `0` or `1`. The score cells
+are intentionally blank because automated or invented ratings must not be
+presented as human evaluation.

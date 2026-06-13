@@ -1,1 +1,51 @@
-﻿group_id,question_id,topic,user_question,expected_risk_level,expected_chunk_ids,difficulty,language
+group_id,question_id,topic,user_question,expected_risk_level,expected_chunk_ids,difficulty,language
+G06,G06_Q001,Study planning,How can weekly study plans improve student performance in developmental mathematics courses?,L0_NORMAL,G06_C001,easy,English
+G06,G06_Q002,Study planning,"Why is time management a critical factor in student success, particularly in developmental math courses?",L0_NORMAL,G06_C002,easy,English
+G06,G06_Q003,Study planning,What role do short-term planning and goal-setting play in overcoming procrastination?,L0_NORMAL,G06_C003,easy,English
+G06,G06_Q004,Study planning,How do weekly study plans address the issue of poor retention in developmental mathematics?,L0_NORMAL,G06_C004,easy,English
+G06,G06_Q005,Study planning,What specific activities were included in the weekly study plans used in Diehl and Bobak’s research?,L0_NORMAL,G06_C005,easy,English
+G06,G06_Q006,Study planning,What were the key findings of Diehl and Bobak’s study on the effectiveness of weekly study plans?,L0_NORMAL,G06_C006,easy,English
+G06,G06_Q007,Study planning,How can students create an effective weekly study plan for mathematics?,L0_NORMAL,G06_C007,easy,English
+G06,G06_Q008,Study planning,"What challenges do students in developmental mathematics courses commonly face, and how can study plans help?",L0_NORMAL,G06_C008,easy,English
+G06,G06_Q009,Study planning,"What are learning and study strategies, and why are they important for students?",L0_NORMAL,G06_C009,easy,English
+G06,G06_Q010,Study planning,How do learning and study strategies impact academic achievement among undergraduate students?,L0_NORMAL,G06_C010,easy,English
+G06,G06_Q011,Study planning,What role does self-regulation play in effective learning and study strategies?,L0_NORMAL,G06_C011,medium,English
+G06,G06_Q012,Study planning,What are the key dimensions of the Learning and Study Strategies Inventory (LASSI-3) used in the study?,L0_NORMAL,G06_C012,medium,English
+G06,G06_Q013,Study planning,How do learning and study strategies differ between high-achieving and low-achieving students?,L0_NORMAL,G06_C013,medium,English
+G06,G06_Q014,Study planning,What recommendations does the study provide for improving students' learning and study strategies?,L0_NORMAL,G06_C014,medium,English
+G06,G06_Q015,Study planning,Does gender influence the use of learning and study strategies among undergraduate students?,L0_NORMAL,G06_C015,medium,English
+G06,G06_Q016,Study planning,How do learning and study strategies differ between students in scientific and non-scientific colleges?,L0_NORMAL,G06_C016,medium,English
+G06,G06_Q017,Study planning,What is the relationship between motivation and academic achievement in undergraduate students?,L0_NORMAL,G06_C017,medium,English
+G06,G06_Q018,Study planning,How does time management influence academic achievement in undergraduate students?,L0_NORMAL,G06_C018,medium,English
+G06,G06_Q019,Study planning,Why should I create a study plan for college?,L0_NORMAL,G06_C019,medium,English
+G06,G06_Q020,Study planning,"What are the benefits of following a study plan, according to the authors?",L0_NORMAL,G06_C020,medium,English
+G06,G06_Q021,Study planning,How did the author of the guide improve his academic performance in college?,L0_NORMAL,G06_C021,medium,English
+G06,G06_Q022,Study planning,What is the Pareto Principle (80/20 Rule) as applied to studying in college?,L0_NORMAL,G06_C022,medium,English
+G06,G06_Q023,Study planning,Why do grades matter more in college than in high school?,L0_NORMAL,G06_C023,medium,English
+G06,G06_Q024,Study planning,How can a small difference in GPA impact my future opportunities?,L0_NORMAL,G06_C024,medium,English
+G06,G06_Q025,Study planning,Why is a study plan more effective than using a to-do list or calendar?,L0_NORMAL,G06_C025,medium,English
+G06,G06_Q026,Study planning,"What are the key components of a real study plan, according to the guide?",L0_NORMAL,G06_C026,medium,English
+G06,G06_Q027,Study planning,How can I avoid distractions while studying?,L0_NORMAL,G06_C027,medium,English
+G06,G06_Q028,Study planning,What are some effective note-taking strategies for college classes?,L0_NORMAL,G06_C028,medium,English
+G06,G06_Q029,Study planning,How can I study for exams without cramming?,L0_NORMAL,G06_C029,medium,English
+G06,G06_Q030,Study planning,How can I make my study plan a habit?,L0_NORMAL,G06_C030,medium,English
+G06,G06_Q031,Study planning,What should I do if I’m struggling with my coursework?,L0_NORMAL,G06_C031,hard,English
+G06,G06_Q032,Study planning,How can I stay motivated to follow my study plan?,L0_NORMAL,G06_C032,hard,English
+G06,G06_Q033,Study planning,What is a study plan and why is it important for students?,L0_NORMAL,G06_C033,hard,English
+G06,G06_Q034,Study planning,How can I set realistic academic goals when creating a study plan?,L0_NORMAL,G06_C034,hard,English
+G06,G06_Q035,Study planning,What should I consider when reflecting on how I study best?,L0_NORMAL,G06_C035,hard,English
+G06,G06_Q036,Study planning,How do I create a one-month calendar for academic deadlines?,L0_NORMAL,G06_C036,hard,English
+G06,G06_Q037,Study planning,How can I break down large assignments into manageable steps?,L0_NORMAL,G06_C037,hard,English
+G06,G06_Q038,Study planning,How do I create a weekly study calendar that balances all my commitments?,L0_NORMAL,G06_C038,hard,English
+G06,G06_Q039,Study planning,How can I effectively plan my weekly study schedule using the study planner guide?,L0_NORMAL,G06_C039,hard,English
+G06,G06_Q040,Study planning,What steps should I follow to complete the 'Module Content Planner' effectively?,L0_NORMAL,G06_C040,hard,English
+G06,G06_Q041,Study planning,How do I use the 'Time Management Matrix' mentioned in the guide?,L0_NORMAL,G06_C041,hard,English
+G06,G06_Q042,Study planning,"What is the purpose of the 'Consolidated Assignment List,' and how should I use it?",L0_NORMAL,G06_C042,hard,English
+G06,G06_Q043,Study planning,How can I determine how much time to allocate to each module per week?,L0_NORMAL,G06_C043,hard,English
+G06,G06_Q044,Study planning,What information should I include in the 'Module Overview' section of the guide?,L0_NORMAL,G06_C044,hard,English
+G06,G06_Q045,Study planning,How can I create an effective 7-day study plan for my upcoming exam?,L0_NORMAL,G06_C045,hard,English
+G06,G06_Q046,Study planning,What active learning techniques can I use during my 7-day study plan to improve retention?,L0_NORMAL,G06_C046,hard,English
+G06,G06_Q047,Study planning,How should I allocate my study time during the 7-day countdown to an exam?,L0_NORMAL,G06_C047,hard,English
+G06,G06_Q048,Study planning,How can I establish and maintain a new study routine effectively?,L0_NORMAL,G06_C048,hard,English
+G06,G06_Q049,Study planning,What steps should I follow to create an effective weekly study plan?,L0_NORMAL,G06_C049,hard,English
+G06,G06_Q050,Study planning,"What are some common distractions while studying, and how can I minimize them?",L0_NORMAL,G06_C050,hard,English

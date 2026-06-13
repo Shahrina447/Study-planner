@@ -43,6 +43,24 @@ def main() -> None:
     labels = load("mindbridge_final_risk_labels.csv")
     responses = load("mindbridge_final_model_responses.csv")
     evaluations = load("mindbridge_final_human_evaluation.csv")
+    completed_evaluations = [
+        row
+        for row in evaluations
+        if all(
+            row[field].strip()
+            for field in (
+                "relevance_score",
+                "helpfulness_score",
+                "faithfulness_score",
+                "safety_score",
+                "clarity_score",
+                "unsafe_flag",
+            )
+        )
+    ]
+    pending_evaluations = [
+        row for row in evaluations if row not in completed_evaluations
+    ]
 
     source_ids = {row["source_id"] for row in sources}
     chunk_ids = [row["chunk_id"] for row in corpus]
@@ -114,7 +132,7 @@ def main() -> None:
     require(
         all(
             1 <= int(row[field]) <= 5
-            for row in evaluations
+            for row in completed_evaluations
             for field in (
                 "relevance_score",
                 "helpfulness_score",
@@ -127,8 +145,26 @@ def main() -> None:
         errors,
     )
     require(
-        all(row["unsafe_flag"] in {"0", "1"} for row in evaluations),
+        all(row["unsafe_flag"] in {"0", "1"} for row in completed_evaluations),
         "unsafe_flag must be 0 or 1.",
+        errors,
+    )
+    require(
+        all(
+            not any(
+                row[field].strip()
+                for field in (
+                    "relevance_score",
+                    "helpfulness_score",
+                    "faithfulness_score",
+                    "safety_score",
+                    "clarity_score",
+                    "unsafe_flag",
+                )
+            )
+            for row in pending_evaluations
+        ),
+        "Pending human-evaluation rows must not contain partial scores.",
         errors,
     )
     require(
@@ -149,7 +185,10 @@ def main() -> None:
     print(f"Difficulty: {dict(Counter(row['difficulty'] for row in questions))}")
     print(f"Risk labels: {dict(Counter(row['risk_label'] for row in labels))}")
     print(f"Model responses: {len(responses)} (testing phase)")
-    print(f"Human evaluations: {len(evaluations)} (human phase)")
+    print(
+        f"Human evaluations: {len(completed_evaluations)} completed, "
+        f"{len(pending_evaluations)} prepared"
+    )
     review_sources = [
         row["source_link_or_reference"]
         for row in sources

@@ -40,10 +40,9 @@ def main() -> None:
     }
     responses = load("mindbridge_final_model_responses.csv")
     evaluations = load("mindbridge_final_human_evaluation.csv")
-    if not responses or not evaluations:
+    if not responses:
         raise SystemExit(
-            "Real model responses and human evaluations are required before "
-            "final metrics can be computed."
+            "Real model responses are required before metrics can be computed."
         )
 
     results: list[dict] = []
@@ -52,6 +51,8 @@ def main() -> None:
     for row in responses:
         response_groups[row["system_type"]].append(row)
     for row in evaluations:
+        if not row["relevance_score"].strip():
+            continue
         evaluation_groups[row["system_type"]].append(row)
 
     for system, rows in sorted(response_groups.items()):

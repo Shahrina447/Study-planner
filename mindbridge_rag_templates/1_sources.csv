@@ -1,1 +1,8 @@
-﻿group_id,source_id,source_title,source_type,source_link_or_reference,reason_for_use
+group_id,source_id,source_title,source_type,source_link_or_reference,reason_for_use
+G06,G06_S001,nced.info,Academic journal resource,https://www.nced.info/jde/,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S002,doi.org,Peer-reviewed research article,https://doi.org/10.33902/JPR.202323615,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S003,theshovelstudymethod.com,Instructor-provided study resource,https://theshovelstudymethod.com,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S004,creativecommons.org,Instructor-provided study resource,http://creativecommons.org/licenses/by-nc-sa/4.0,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S005,bit.ly,Instructor-provided study resource,http://bit.ly/30ygrIl,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S006,learningcenter.unc.edu,University academic support page,https://learningcenter.unc.edu/tips-and-tools/studying-101-study-smarter-not-harder/,"Supports safe, practical study-planning and academic-skills guidance."
+G06,G06_S007,academicsupport.university.edu,University academic support page,https://academicsupport.university.edu/studyplan,"Supports safe, practical study-planning and academic-skills guidance."
