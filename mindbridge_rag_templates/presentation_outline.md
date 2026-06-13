@@ -4,7 +4,7 @@
 
 - Group: G06
 - Topic: Study planning
-- Contributors recorded in the report: Shahrina Khan and Abdullah Iqbal
+- Contributors: Sharina Khan, Saira Batool, and Irsa Sattar
 - Goal: build safe study-planning knowledge and evaluate S0, S1, and S2
 
 ## Slide 2: Problem Focus

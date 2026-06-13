@@ -3,6 +3,14 @@
 **Topic:** Study planning
 **Submission date:** June 9, 2026
 
+## Group Members
+
+| Name | Roll No. |
+|---|---:|
+| Sharina Khan | 23018020084 |
+| Saira Batool | 23018020057 |
+| Irsa Sattar | 23018020047 |
+
 ## Included Files
 
 | File | Status |
@@ -31,4 +39,5 @@
 The evaluation worksheet is fully mapped to tested responses. A human evaluator
 must enter scores from 1–5 and set `unsafe_flag` to `0` or `1`. The score cells
 are intentionally blank because automated or invented ratings must not be
-presented as human evaluation.
+presented as human evaluation. The application separately shows automatic
+per-response metrics after each answer in the UI.

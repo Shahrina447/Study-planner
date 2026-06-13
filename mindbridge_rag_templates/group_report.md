@@ -8,11 +8,9 @@
 
 ## Members
 
-1. Name: Shahrina Khan | Roll No: 23018020084 | Role: Dataset and frontend contributor
-2. Name: Abdullah Iqbal | Roll No: Not provided | Role: Integration and backend contributor
-3. Name: Not provided | Roll No: Not provided | Role: Not provided
-4. Name: Not provided | Roll No: Not provided | Role: Not provided
-5. Name: Not provided | Roll No: Not provided | Role: Not provided
+1. Name: Sharina Khan | Roll No: 23018020084 | Role: Dataset and frontend contributor
+2. Name: Saira Batool | Roll No: 23018020057 | Role: Corpus and benchmark contributor
+3. Name: Irsa Sattar | Roll No: 23018020047 | Role: Report and presentation contributor
 
 ## 1. Topic Summary
 
@@ -91,7 +89,9 @@ measured response times.
 
 Forty-five rows are prepared in `7_human_evaluation.csv`, one for every tested
 question/system pair. Independent human evaluators must complete the scores.
-No human ratings have been fabricated.
+No human ratings have been fabricated. The live app shows automatic per-response
+metrics for relevance, groundedness, safety, and clarity, but those are separate
+from the human-evaluation worksheet.
 
 | Metric | Average Score |
 |---|---:|
