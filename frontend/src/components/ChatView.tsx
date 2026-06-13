@@ -118,6 +118,15 @@ const columns = [
   },
 ] as const;
 
+const starterQuestions = [
+  "How can I create a realistic study plan for final exams?",
+  "What should I do when I feel too stressed to start studying?",
+  "How can I revise a long chapter more efficiently?",
+  "Can you help me balance assignments, quizzes, and rest this week?",
+  "What are signs that exam stress is becoming unsafe?",
+  "How should I prepare for a difficult test in three days?",
+];
+
 function SettingSlider({
   label,
   value,
@@ -303,10 +312,12 @@ export function ChatView() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [loadingRowId, setLoadingRowId] = useState<string | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const responseGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (rows.length > 0 || loadingRowId) {
+      responseGridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }, [rows, loadingRowId]);
 
   useEffect(() => {
@@ -361,9 +372,8 @@ export function ChatView() {
     loadConversation();
   }, [selectedConversationId]);
 
-  const ask = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const question = input.trim();
+  const submitQuestion = async (rawQuestion: string) => {
+    const question = rawQuestion.trim();
     if (!question || loadingRowId) return;
 
     const now = new Date();
@@ -420,8 +430,15 @@ export function ChatView() {
     }
   };
 
+  const ask = (event?: FormEvent) => {
+    event?.preventDefault();
+    void submitQuestion(input);
+  };
+
   const latestRow = rows.at(-1);
   const loading = latestRow ? loadingRowId === latestRow.id : false;
+  const showStarterQuestions = !latestRow && !loadingConversation;
+  const showResponseGrid = Boolean(latestRow);
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-secondary">
@@ -494,13 +511,24 @@ export function ChatView() {
             </div>
           )}
 
-          {!latestRow && !loadingConversation && (
-            <div className="rounded-lg border border-border bg-card p-6">
-              <p className="text-sm font-semibold">Ask a benchmark-style student question to compare all systems.</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                The four columns match the required project comparison: S0, research corpus, S1, and S2.
-              </p>
-            </div>
+          {showStarterQuestions && (
+            <section className="rounded-lg border border-border bg-card p-4">
+              <h2 className="mb-3 font-display text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Starter Questions
+              </h2>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {starterQuestions.map((question) => (
+                  <button
+                    key={question}
+                    type="button"
+                    onClick={() => void submitQuestion(question)}
+                    className="min-h-12 rounded-md border border-border bg-secondary/60 px-3 py-2 text-left text-xs font-semibold leading-relaxed text-foreground/80 transition hover:border-primary/40 hover:bg-secondary"
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            </section>
           )}
 
           {loadingConversation && (
@@ -509,16 +537,18 @@ export function ChatView() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
-            {columns.map((column) => (
-              <SystemPanel
-                key={column.key}
-                config={column}
-                result={latestRow?.systems?.[column.key]}
-                loading={loading}
-              />
-            ))}
-          </div>
+          {showResponseGrid && (
+            <div ref={responseGridRef} className="grid scroll-mt-4 grid-cols-1 gap-4 xl:grid-cols-4">
+              {columns.map((column) => (
+                <SystemPanel
+                  key={column.key}
+                  config={column}
+                  result={latestRow?.systems?.[column.key]}
+                  loading={loading}
+                />
+              ))}
+            </div>
+          )}
 
           {rows.length > 1 && (
             <div className="rounded-lg border border-border bg-card p-4">
@@ -539,7 +569,6 @@ export function ChatView() {
               </div>
             </div>
           )}
-          <div ref={endRef} />
         </div>
       </main>
 
