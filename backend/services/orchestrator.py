@@ -1,7 +1,7 @@
 import re
 import asyncio
 from time import perf_counter
-from mistralai.client import Mistral
+from mistralai import Mistral
 from config import settings
 from rag.retriever import retriever
 
