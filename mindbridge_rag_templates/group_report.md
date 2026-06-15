@@ -10,7 +10,7 @@
 
 1. Name: Sharina Khan | Roll No: 23018020084 | Role: Dataset and frontend contributor
 2. Name: Saira Batool | Roll No: 23018020057 | Role: Corpus and benchmark contributor
-3. Name: Irsa Sattar | Roll No: 23018020047 | Role: Report and presentation contributor
+3. Name: Irsa Sattar | Roll No: 23018020045 | Role: Report and presentation contributor
 
 ## 1. Topic Summary
 

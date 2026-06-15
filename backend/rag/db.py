@@ -143,7 +143,7 @@ class Database:
                     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
                     content TEXT NOT NULL,
                     mode TEXT,
-                    metadata JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
                 """
